@@ -39,7 +39,7 @@ app.post('/whatsapp', async (req, res) => {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'claude-opus-4-6',
       max_tokens: 1024,
       system: ARIA_SYSTEM,
       messages: conversations[from],
