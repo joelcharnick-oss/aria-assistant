@@ -1,10 +1,12 @@
 const express = require('express');
+const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const twilio = require('twilio');
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 

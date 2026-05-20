@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🌅 Breakfast Picker!</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Arial Rounded MT Bold', 'Comic Sans MS', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(160deg, #FFEAA7 0%, #FFD3B6 45%, #FFAAA5 100%);
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: 20px 16px 48px;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: clamp(1.9em, 8vw, 2.6em);
+      color: #c0392b;
+      text-shadow: 3px 3px 0 #f39c12, 6px 6px 0 rgba(0,0,0,0.08);
+      line-height: 1.2;
+      animation: title-wobble 3s ease-in-out infinite;
+    }
+
+    .subtitle {
+      font-size: clamp(0.9em, 3.5vw, 1.05em);
+      color: #7f4f2e;
+      margin-top: 8px;
+      opacity: 0.8;
+    }
+
+    @keyframes title-wobble {
+      0%, 100% { transform: rotate(-1.5deg) scale(1); }
+      50%       { transform: rotate(1.5deg) scale(1.03); }
+    }
+
+    /* ===== GRID ===== */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .card {
+      border-radius: 26px;
+      padding: 26px 12px 20px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      border: 3px solid rgba(255,255,255,0.55);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07);
+      transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.12);
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    .card:active { transform: scale(0.91) rotate(-1.5deg); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+
+    .card-emoji {
+      font-size: clamp(3em, 13vw, 4.2em);
+      display: block;
+      margin-bottom: 10px;
+      line-height: 1;
+      filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.12));
+    }
+
+    .card-name {
+      font-size: clamp(0.88em, 3.4vw, 1.05em);
+      font-weight: bold;
+      color: rgba(0,0,0,0.72);
+      letter-spacing: 0.01em;
+    }
+
+    /* Card themes */
+    .c-pancakes { background: linear-gradient(145deg,#FFCD7B,#FF8C42); }
+    .c-eggs     { background: linear-gradient(145deg,#FFE77A,#F4A203); }
+    .c-cereal   { background: linear-gradient(145deg,#C9B8FF,#7C5CBF); }
+    .c-toast    { background: linear-gradient(145deg,#FFDCA0,#E05C2A); }
+    .c-waffles  { background: linear-gradient(145deg,#FFB3D9,#D6006E); }
+    .c-smoothie { background: linear-gradient(145deg,#7FFFD4,#00A870); }
+    .c-bacon    { background: linear-gradient(145deg,#FF9B9B,#C0392B); }
+    .c-fruit    { background: linear-gradient(145deg,#96D7FF,#1A7FC1); }
+
+    /* ===== OVERLAY ===== */
+    #overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #overlay.show { display: flex; }
+
+    #overlay-bg {
+      position: absolute;
+      inset: 0;
+      opacity: 0.93;
+      transition: background 0.3s;
+    }
+
+    #overlay-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    #overlay-card {
+      position: relative;
+      z-index: 10;
+      background: rgba(255,255,255,0.96);
+      border-radius: 34px;
+      padding: 44px 32px 36px;
+      text-align: center;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.12);
+      max-width: 340px;
+      width: 100%;
+      animation: pop-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    }
+
+    @keyframes pop-in {
+      from { transform: scale(0.4) rotate(-6deg); opacity: 0; }
+      to   { transform: scale(1)   rotate(0deg);  opacity: 1; }
+    }
+
+    #result-emoji {
+      font-size: 5.5em;
+      display: block;
+      margin-bottom: 14px;
+      animation: emoji-spin 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.25s both;
+    }
+
+    @keyframes emoji-spin {
+      from { transform: scale(0) rotate(-200deg); }
+      to   { transform: scale(1) rotate(0deg); }
+    }
+
+    .result-label {
+      font-size: 0.85em;
+      color: #aaa;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 4px;
+    }
+
+    #result-name {
+      font-size: 2em;
+      font-weight: bold;
+      color: #222;
+      margin-bottom: 12px;
+      text-shadow: 2px 2px 0 rgba(0,0,0,0.06);
+    }
+
+    #result-message {
+      font-size: 1.05em;
+      color: #666;
+      line-height: 1.55;
+      margin-bottom: 30px;
+    }
+
+    #dismiss-btn {
+      display: inline-block;
+      padding: 17px 44px;
+      font-size: 1.15em;
+      font-family: inherit;
+      font-weight: bold;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
+      box-shadow: 0 6px 22px rgba(0,0,0,0.22);
+      letter-spacing: 0.03em;
+    }
+    #dismiss-btn:active { transform: scale(0.93); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🌅 Breakfast Picker!</h1>
+  <p class="subtitle">Tap your breakfast to get started!</p>
+</header>
+
+<div class="grid">
+  <div class="card c-pancakes" onclick="pick('pancakes')">
+    <span class="card-emoji">🥞</span>
+    <span class="card-name">Pancakes</span>
+  </div>
+  <div class="card c-eggs" onclick="pick('eggs')">
+    <span class="card-emoji">🍳</span>
+    <span class="card-name">Scrambled Eggs</span>
+  </div>
+  <div class="card c-cereal" onclick="pick('cereal')">
+    <span class="card-emoji">🥣</span>
+    <span class="card-name">Cereal</span>
+  </div>
+  <div class="card c-toast" onclick="pick('toast')">
+    <span class="card-emoji">🍞</span>
+    <span class="card-name">Toast & Jam</span>
+  </div>
+  <div class="card c-waffles" onclick="pick('waffles')">
+    <span class="card-emoji">🧇</span>
+    <span class="card-name">Waffles</span>
+  </div>
+  <div class="card c-smoothie" onclick="pick('smoothie')">
+    <span class="card-emoji">🥤</span>
+    <span class="card-name">Smoothie</span>
+  </div>
+  <div class="card c-bacon" onclick="pick('bacon')">
+    <span class="card-emoji">🥓</span>
+    <span class="card-name">Bacon & Eggs</span>
+  </div>
+  <div class="card c-fruit" onclick="pick('fruit')">
+    <span class="card-emoji">🍓</span>
+    <span class="card-name">Fruit Bowl</span>
+  </div>
+</div>
+
+<!-- Result overlay -->
+<div id="overlay">
+  <div id="overlay-bg"></div>
+  <canvas id="overlay-canvas"></canvas>
+  <div id="overlay-card">
+    <span id="result-emoji"></span>
+    <div class="result-label">You chose…</div>
+    <div id="result-name"></div>
+    <div id="result-message"></div>
+    <button id="dismiss-btn" onclick="dismiss()">Yummy! 😋</button>
+  </div>
+</div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+const MENU = {
+  pancakes: {
+    name: 'Pancakes', emoji: '🥞',
+    bg: 'linear-gradient(145deg,#FF9F43,#EE5A24)',
+    btn: '#E05020',
+    msg: 'Fluffy stacks and rivers of maple syrup! 🍯',
+    fx: 'syrup',
+  },
+  eggs: {
+    name: 'Scrambled Eggs', emoji: '🍳',
+    bg: 'linear-gradient(145deg,#FFC312,#F79F1F)',
+    btn: '#D4860A',
+    msg: 'Soft, golden and scrambled to perfection! ⭐',
+    fx: 'stars',
+  },
+  cereal: {
+    name: 'Cereal', emoji: '🥣',
+    bg: 'linear-gradient(145deg,#A29BFE,#6C5CE7)',
+    btn: '#5544CC',
+    msg: 'Snap, crackle, pop! Add extra milk! 🥛',
+    fx: 'circles',
+  },
+  toast: {
+    name: 'Toast & Jam', emoji: '🍞',
+    bg: 'linear-gradient(145deg,#FDCB6E,#E17055)',
+    btn: '#C85030',
+    msg: 'Crispy golden toast with jammy goodness! 🍓',
+    fx: 'crumbs',
+  },
+  waffles: {
+    name: 'Waffles', emoji: '🧇',
+    bg: 'linear-gradient(145deg,#FD79A8,#E84393)',
+    btn: '#C01870',
+    msg: 'Perfectly square and oh-so-syrupy! ✨',
+    fx: 'sparkles',
+  },
+  smoothie: {
+    name: 'Smoothie', emoji: '🥤',
+    bg: 'linear-gradient(145deg,#55EFC4,#00B894)',
+    btn: '#007F60',
+    msg: 'Blend it up and drink the rainbow! 🌈',
+    fx: 'bubbles',
+  },
+  bacon: {
+    name: 'Bacon & Eggs', emoji: '🥓',
+    bg: 'linear-gradient(145deg,#FF7675,#D63031)',
+    btn: '#A01818',
+    msg: 'Sizzling hot strips and sunny eggs! 🔥',
+    fx: 'sizzle',
+  },
+  fruit: {
+    name: 'Fruit Bowl', emoji: '🍓',
+    bg: 'linear-gradient(145deg,#74B9FF,#0984E3)',
+    btn: '#055FA0',
+    msg: 'Fresh, colourful and super healthy! 🌟',
+    fx: 'fruits',
+  },
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+const overlay  = document.getElementById('overlay');
+const bgEl     = document.getElementById('overlay-bg');
+const canvas   = document.getElementById('overlay-canvas');
+const ctx      = canvas.getContext('2d');
+let raf = null;
+let particles = [];
+
+// ─── Pick / Dismiss ──────────────────────────────────────────────────────────
+function pick(id) {
+  const b = MENU[id];
+  document.getElementById('result-emoji').textContent   = b.emoji;
+  document.getElementById('result-name').textContent    = b.name;
+  document.getElementById('result-message').textContent = b.msg;
+  bgEl.style.background = b.bg;
+  document.getElementById('dismiss-btn').style.background = b.btn;
+
+  overlay.classList.add('show');
+
+  // Re-trigger animations
+  ['overlay-card', 'result-emoji'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.animation = 'none';
+    el.offsetHeight;
+    el.style.animation = '';
+  });
+
+  resizeCanvas();
+  launchFx(b.fx);
+}
+
+function dismiss() {
+  overlay.classList.remove('show');
+  if (raf) { cancelAnimationFrame(raf); raf = null; }
+  particles = [];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ─── Canvas helpers ───────────────────────────────────────────────────────────
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.update();
+    p.draw(ctx);
+    if (p.dead) particles.splice(i, 1);
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+function launchFx(type) {
+  if (raf) cancelAnimationFrame(raf);
+  particles = [];
+  FX[type]();
+  loop();
+}
+
+// ─── Particle factories ───────────────────────────────────────────────────────
+const FX = {
+
+  // 🥞 Pancakes – golden syrup drops fall from above
+  syrup() {
+    const cols = ['#8B4513','#CD853F','#D2691E','#A0522D','#DAA520','#C68642'];
+    for (let i = 0; i < 70; i++) {
+      delay(i * 55, () => {
+        spawn({
+          x: rnd(0, canvas.width), y: rnd(-80, -10),
+          w: rnd(4, 12), h: rnd(18, 36),
+          vx: rnd(-1, 1), vy: rnd(3, 7),
+          color: pick1(cols), alpha: rnd(0.7, 1),
+          update() { this.x += this.vx; this.y += this.vy; if (this.y > canvas.height + 60) this.dead = true; },
+          draw(c) {
+            c.globalAlpha = this.alpha;
+            c.fillStyle = this.color;
+            c.beginPath();
+            c.ellipse(this.x, this.y, this.w / 2, this.h / 2, 0.2, 0, TAU);
+            c.fill();
+            c.globalAlpha = 1;
+          },
+        });
+      });
+    }
+  },
+
+  // 🍳 Eggs – yellow stars burst from centre
+  stars() {
+    const cols = ['#FFD700','#FFA500','#FFFF33','#FFE066','#FFF176'];
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    for (let i = 0; i < 55; i++) {
+      const angle = rnd(0, TAU), spd = rnd(3, 10);
+      spawn({
+        x: cx, y: cy,
+        vx: cos(angle) * spd, vy: sin(angle) * spd,
+        size: rnd(10, 22), color: pick1(cols),
+        rot: rnd(0, TAU), rotV: rnd(-0.3, 0.3),
+        alpha: 1, gravity: 0.18,
+        update() {
+          this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
+          this.rot += this.rotV; this.alpha -= 0.013;
+          if (this.alpha <= 0) this.dead = true;
+        },
+        draw(c) {
+          c.save(); c.globalAlpha = this.alpha;
+          c.translate(this.x, this.y); c.rotate(this.rot);
+          c.fillStyle = this.color;
+          star5(c, 0, 0, this.size, this.size * 0.45); c.fill();
+          c.restore();
+        },
+      });
+    }
+  },
+
+  // 🥣 Cereal – colourful Os rain down
+  circles() {
+    const cols = ['#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#FFD93D','#A29BFE','#FF9FF3'];
+    for (let i = 0; i < 90; i++) {
+      delay(i * 35, () => {
+        spawn({
+          x: rnd(0, canvas.width), y: rnd(-100, -8),
+          vx: rnd(-2.5, 2.5), vy: rnd(2, 5),
+          r: rnd(7, 16), color: pick1(cols), lw: rnd(3, 5),
+          rot: rnd(0, TAU), rotV: rnd(-0.12, 0.12),
+          update() {
+            this.x += this.vx; this.y += this.vy; this.rot += this.rotV;
+            if (this.y > canvas.height + 30) this.dead = true;
+          },
+          draw(c) {
+            c.save(); c.translate(this.x, this.y); c.rotate(this.rot);
+            c.strokeStyle = this.color; c.lineWidth = this.lw;
+            c.beginPath(); c.arc(0, 0, this.r, 0, TAU); c.stroke();
+            c.restore();
+          },
+        });
+      });
+    }
+  },
+
+  // 🍞 Toast – crumbs explode in 4 waves from card centre
+  crumbs() {
+    const cols = ['#D2691E','#8B4513','#A0522D','#CD853F','#DEB887','#F4A460'];
+    const cx = canvas.width / 2, cy = canvas.height * 0.42;
+    for (let wave = 0; wave < 5; wave++) {
+      delay(wave * 260, () => {
+        for (let i = 0; i < 18; i++) {
+          const angle = rnd(0, TAU), spd = rnd(4, 13);
+          spawn({
+            x: cx + rnd(-30, 30), y: cy + rnd(-30, 30),
+            vx: cos(angle) * spd, vy: sin(angle) * spd - 4,
+            size: rnd(3, 9), color: pick1(cols),
+            gravity: 0.45, rot: rnd(0, TAU), rotV: rnd(-0.4, 0.4), alpha: 1,
+            update() {
+              this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
+              this.vx *= 0.98; this.rot += this.rotV;
+              if (this.y > canvas.height + 20) this.dead = true;
+            },
+            draw(c) {
+              c.save(); c.globalAlpha = this.alpha; c.fillStyle = this.color;
+              c.translate(this.x, this.y); c.rotate(this.rot);
+              c.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+              c.restore();
+            },
+          });
+        }
+      });
+    }
+  },
+
+  // 🧇 Waffles – diamond sparkles appear and fade all over screen
+  sparkles() {
+    const cols = ['#FFD700','#FF69B4','#FF1493','#FFB6C1','#FFFACD','#FFE4E1'];
+    let count = 0;
+    (function addNext() {
+      if (!overlay.classList.contains('show') || count >= 150) return;
+      count++;
+      spawn({
+        x: rnd(0, canvas.width), y: rnd(0, canvas.height),
+        size: rnd(6, 24), color: pick1(cols),
+        rot: rnd(0, TAU), alpha: 0, phase: 'in',
+        spd: rnd(0.035, 0.07),
+        update() {
+          if (this.phase === 'in') { this.alpha += this.spd; if (this.alpha >= 1) { this.alpha = 1; this.phase = 'out'; } }
+          else { this.alpha -= this.spd * 0.65; if (this.alpha <= 0) this.dead = true; }
+        },
+        draw(c) {
+          c.save(); c.globalAlpha = this.alpha; c.fillStyle = this.color;
+          c.translate(this.x, this.y); c.rotate(this.rot);
+          const s = this.size;
+          c.beginPath();
+          c.moveTo(0, -s); c.quadraticCurveTo(s * 0.18, -s * 0.18, s, 0);
+          c.quadraticCurveTo(s * 0.18,  s * 0.18, 0, s);
+          c.quadraticCurveTo(-s * 0.18, s * 0.18, -s, 0);
+          c.quadraticCurveTo(-s * 0.18, -s * 0.18, 0, -s);
+          c.fill(); c.restore();
+        },
+      });
+      setTimeout(addNext, rnd(80, 180));
+    })();
+  },
+
+  // 🥤 Smoothie – coloured bubbles float up from bottom
+  bubbles() {
+    const cols = ['#55EFC4','#00CEC9','#FDCB6E','#A29BFE','#FD79A8','#74B9FF','#FFD93D'];
+    for (let i = 0; i < 90; i++) {
+      delay(i * 70 + rnd(0, 50), () => {
+        const r = rnd(9, 32);
+        spawn({
+          x: rnd(0, canvas.width), y: canvas.height + r,
+          r, color: pick1(cols), alpha: rnd(0.35, 0.75),
+          vy: -(rnd(1.5, 3.5)), vx: rnd(-0.5, 0.5),
+          wobble: rnd(0, TAU), wobV: rnd(0.04, 0.09),
+          update() {
+            this.wobble += this.wobV;
+            this.x += sin(this.wobble) * 1.8 + this.vx;
+            this.y += this.vy;
+            if (this.y < -this.r * 2) this.dead = true;
+          },
+          draw(c) {
+            c.globalAlpha = this.alpha; c.fillStyle = this.color;
+            c.beginPath(); c.arc(this.x, this.y, this.r, 0, TAU); c.fill();
+            c.globalAlpha = this.alpha * 0.55; c.fillStyle = 'white';
+            c.beginPath(); c.arc(this.x - this.r * 0.28, this.y - this.r * 0.28, this.r * 0.24, 0, TAU); c.fill();
+            c.globalAlpha = 1;
+          },
+        });
+      });
+    }
+  },
+
+  // 🥓 Bacon – hot embers drift upward with a wavy sizzle
+  sizzle() {
+    const cols = ['#FF4500','#FF6348','#FF7F50','#FFA502','#FF6B6B','#C0392B'];
+    for (let i = 0; i < 120; i++) {
+      delay(i * 40, () => {
+        spawn({
+          x: rnd(0, canvas.width),
+          y: canvas.height * 0.55 + rnd(0, canvas.height * 0.45),
+          vx: rnd(-1.2, 1.2), vy: -(rnd(1.2, 4)),
+          size: rnd(3, 9), color: pick1(cols), alpha: 0.85,
+          wobble: rnd(0, TAU), wobV: rnd(0.1, 0.2),
+          update() {
+            this.wobble += this.wobV;
+            this.x += sin(this.wobble) * 2.5 + this.vx;
+            this.y += this.vy; this.alpha -= 0.012; this.size *= 1.01;
+            if (this.alpha <= 0) this.dead = true;
+          },
+          draw(c) {
+            c.globalAlpha = this.alpha; c.fillStyle = this.color;
+            c.beginPath(); c.arc(this.x, this.y, this.size, 0, TAU); c.fill();
+            c.globalAlpha = 1;
+          },
+        });
+      });
+    }
+  },
+
+  // 🍓 Fruit – emoji fruits explode outward from centre
+  fruits() {
+    const list = ['🍓','🍊','🍋','🍇','🍍','🥝','🍒','🍑','🍎','🫐','🍌','🍉'];
+    const cx = canvas.width / 2, cy = canvas.height * 0.45;
+    for (let i = 0; i < 36; i++) {
+      delay(i * 80 + rnd(0, 60), () => {
+        const angle = rnd(0, TAU), spd = rnd(5, 14);
+        spawn({
+          x: cx, y: cy,
+          vx: cos(angle) * spd, vy: sin(angle) * spd - 5,
+          emoji: pick1(list), size: rnd(22, 38),
+          gravity: 0.32, rot: rnd(-0.4, 0.4), rotV: rnd(-0.08, 0.08), alpha: 1,
+          update() {
+            this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
+            this.vx *= 0.99; this.rot += this.rotV;
+            if (this.y > canvas.height + 60) this.dead = true;
+          },
+          draw(c) {
+            c.save(); c.globalAlpha = this.alpha;
+            c.translate(this.x, this.y); c.rotate(this.rot);
+            c.font = `${this.size}px serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+            c.fillText(this.emoji, 0, 0);
+            c.restore();
+          },
+        });
+      });
+    }
+  },
+};
+
+// ─── Util ─────────────────────────────────────────────────────────────────────
+const TAU = Math.PI * 2;
+const cos = Math.cos, sin = Math.sin;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick1 = arr => arr[Math.floor(Math.random() * arr.length)];
+const delay = (ms, fn) => { if (overlay.classList.contains('show') || ms === 0) setTimeout(fn, ms); };
+const spawn = p => { p.dead = false; particles.push(p); };
+
+function star5(c, cx, cy, r, ir) {
+  let rot = -Math.PI / 2;
+  const step = Math.PI / 5;
+  c.beginPath(); c.moveTo(cx + cos(rot) * r, cy + sin(rot) * r);
+  for (let i = 0; i < 5; i++) {
+    rot += step; c.lineTo(cx + cos(rot) * ir, cy + sin(rot) * ir);
+    rot += step; c.lineTo(cx + cos(rot) * r,  cy + sin(rot) * r);
+  }
+  c.closePath();
+}
+
+window.addEventListener('resize', () => { if (overlay.classList.contains('show')) resizeCanvas(); });
+overlay.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+</script>
+</body>
+</html>
