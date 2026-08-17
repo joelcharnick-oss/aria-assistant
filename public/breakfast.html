@@ -4,108 +4,367 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>🌅 Breakfast Picker!</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    /* ── Tokens ─────────────────────────────────────────────────────────── */
+    :root {
+      /* Parent-mode surface (dark forest — calm pre-sunrise kitchen) */
+      --p-bg:        #0E1A18;
+      --p-surface:   #172320;
+      --p-edge:      #1F302C;
+      --p-text:      #EFE8D8;
+      --p-text2:     #94A8A2;
+      --p-amber:     #E8B44A;
+      --p-amber-dim: rgba(232,180,74,0.15);
+      --p-toggle-on: #4EAA80;
+
+      /* Kid-mode surface (warm daylight) */
+      --k-bg-top:    #FDF3E3;
+      --k-bg-bot:    #FFE0B0;
+      --k-text:      #2A1A08;
+      --k-text2:     #8C6A44;
+      --k-surface:   rgba(255,255,255,0.82);
+
+      /* Shared */
+      --radius-card: 22px;
+      --radius-row:  14px;
+      --radius-pill: 50px;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html { height: 100%; }
 
     body {
-      font-family: 'Arial Rounded MT Bold', 'Comic Sans MS', 'Helvetica Neue', sans-serif;
-      background: linear-gradient(160deg, #FFEAA7 0%, #FFD3B6 45%, #FFAAA5 100%);
-      min-height: 100vh;
+      font-family: 'DM Sans', system-ui, sans-serif;
       min-height: 100dvh;
-      padding: 20px 16px 48px;
       overflow-x: hidden;
     }
 
-    header {
-      text-align: center;
-      margin-bottom: 28px;
-    }
+    .hidden { display: none !important; }
 
-    h1 {
-      font-size: clamp(1.9em, 8vw, 2.6em);
-      color: #c0392b;
-      text-shadow: 3px 3px 0 #f39c12, 6px 6px 0 rgba(0,0,0,0.08);
-      line-height: 1.2;
-      animation: title-wobble 3s ease-in-out infinite;
-    }
-
-    .subtitle {
-      font-size: clamp(0.9em, 3.5vw, 1.05em);
-      color: #7f4f2e;
-      margin-top: 8px;
-      opacity: 0.8;
-    }
-
-    @keyframes title-wobble {
-      0%, 100% { transform: rotate(-1.5deg) scale(1); }
-      50%       { transform: rotate(1.5deg) scale(1.03); }
-    }
-
-    /* ===== GRID ===== */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 14px;
-      max-width: 480px;
+    /* ════════════════════════════════════════════════════════════════════
+       PARENT SETUP VIEW
+    ════════════════════════════════════════════════════════════════════ */
+    #setup-view {
+      background: var(--p-bg);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: 52px 24px 40px;
+      max-width: 540px;
       margin: 0 auto;
     }
 
-    .card {
-      border-radius: 26px;
-      padding: 26px 12px 20px;
-      text-align: center;
+    .setup-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--p-amber);
+      margin-bottom: 10px;
+    }
+
+    .setup-h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(2em, 6vw, 2.8em);
+      font-weight: 700;
+      line-height: 1.08;
+      color: var(--p-text);
+      text-wrap: balance;
+    }
+
+    .setup-h1 em {
+      font-style: italic;
+      font-weight: 300;
+      color: var(--p-text2);
+    }
+
+    .setup-sub {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--p-text2);
+      line-height: 1.55;
+    }
+
+    /* ── Toggle list ─────────────────────────────────────────────────── */
+    .toggle-list {
+      margin-top: 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      flex: 1;
+    }
+
+    .t-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 15px 18px;
+      background: var(--p-surface);
+      border-radius: 8px;
       cursor: pointer;
       user-select: none;
-      border: 3px solid rgba(255,255,255,0.55);
-      box-shadow: 0 8px 22px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07);
+      border: 1px solid var(--p-edge);
+      transition: background 0.12s;
+      position: relative;
+    }
+
+    /* Rounded ends for the grouped list feel */
+    .t-row:first-child { border-radius: var(--radius-row) var(--radius-row) 8px 8px; }
+    .t-row:last-child  { border-radius: 8px 8px var(--radius-row) var(--radius-row); }
+
+    .t-row:active { background: var(--p-edge); }
+
+    /* Active accent bar */
+    .t-row::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 20%; bottom: 20%;
+      width: 3px;
+      background: var(--p-amber);
+      border-radius: 0 2px 2px 0;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .t-row.on::before { opacity: 1; }
+
+    .t-emoji {
+      font-size: 26px;
+      width: 36px;
+      text-align: center;
+      flex-shrink: 0;
+      transition: filter 0.2s;
+      line-height: 1;
+    }
+    .t-row.off .t-emoji { filter: grayscale(1) opacity(0.35); }
+
+    .t-name {
+      flex: 1;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--p-text);
+      transition: color 0.2s;
+    }
+    .t-row.off .t-name { color: var(--p-text2); }
+
+    /* iOS-style toggle */
+    .t-switch {
+      width: 48px;
+      height: 28px;
+      border-radius: 14px;
+      background: var(--p-edge);
+      border: 1.5px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+      position: relative;
+      transition: background 0.22s;
+    }
+    .t-switch::after {
+      content: '';
+      position: absolute;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      top: 2.5px; left: 2.5px;
+      transition: transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    }
+    .t-row.on .t-switch { background: var(--p-toggle-on); border-color: var(--p-toggle-on); }
+    .t-row.on .t-switch::after { transform: translateX(20px); }
+
+    /* ── CTA ─────────────────────────────────────────────────────────── */
+    .setup-footer {
+      margin-top: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .count-line {
+      text-align: center;
+      font-size: 13px;
+      color: var(--p-text2);
+    }
+    .count-line strong { color: var(--p-amber); font-weight: 600; }
+
+    .btn-go {
+      padding: 18px 28px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--p-bg);
+      background: var(--p-amber);
+      border: none;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s;
+      letter-spacing: 0.01em;
+    }
+    .btn-go:active { transform: scale(0.97); opacity: 0.88; }
+
+    /* ════════════════════════════════════════════════════════════════════
+       KID PICK VIEW
+    ════════════════════════════════════════════════════════════════════ */
+    #pick-view {
+      min-height: 100dvh;
+      background: linear-gradient(175deg, var(--k-bg-top) 0%, var(--k-bg-bot) 100%);
+      display: flex;
+      flex-direction: column;
+      padding: 36px 18px 48px;
+    }
+
+    .pick-header {
+      text-align: center;
+      position: relative;
+      margin-bottom: 26px;
+    }
+
+    .pick-h1 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(2.1em, 8.5vw, 3.2em);
+      font-weight: 700;
+      color: var(--k-text);
+      line-height: 1.1;
+      text-wrap: balance;
+    }
+
+    .sun {
+      display: inline-block;
+      animation: sun-spin 6s ease-in-out infinite;
+      transform-origin: center;
+    }
+    @keyframes sun-spin {
+      0%, 100% { transform: rotate(-8deg) scale(1); }
+      50%       { transform: rotate(8deg) scale(1.1); }
+    }
+
+    .pick-sub {
+      margin-top: 6px;
+      font-size: 15px;
+      color: var(--k-text2);
+    }
+
+    .gear-btn {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px; height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--k-surface);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      font-size: 17px;
+      cursor: pointer;
+      color: var(--k-text2);
+      transition: background 0.12s;
+    }
+    .gear-btn:active { background: rgba(255,255,255,0.6); }
+
+    /* ── Card grid ───────────────────────────────────────────────────── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      flex: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    @media (min-width: 600px) {
+      .card-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (min-width: 800px) {
+      .card-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .bcard {
+      border-radius: var(--radius-card);
+      padding: 28px 12px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      user-select: none;
+      border: 2px solid rgba(255,255,255,0.4);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.07);
       transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s;
       position: relative;
       overflow: hidden;
     }
-
-    .card::after {
+    .bcard::after {
       content: '';
       position: absolute;
       inset: 0;
-      background: rgba(255,255,255,0.12);
-      border-radius: inherit;
+      background: rgba(255,255,255,0.1);
       pointer-events: none;
     }
+    .bcard:active {
+      transform: scale(0.91) rotate(-1.2deg);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
 
-    .card:active { transform: scale(0.91) rotate(-1.5deg); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-
-    .card-emoji {
-      font-size: clamp(3em, 13vw, 4.2em);
-      display: block;
-      margin-bottom: 10px;
+    .bcard-emoji {
+      font-size: clamp(2.8em, 11vw, 3.8em);
       line-height: 1;
-      filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.12));
+      filter: drop-shadow(1px 3px 6px rgba(0,0,0,0.14));
     }
 
-    .card-name {
-      font-size: clamp(0.88em, 3.4vw, 1.05em);
-      font-weight: bold;
-      color: rgba(0,0,0,0.72);
-      letter-spacing: 0.01em;
+    .bcard-name {
+      font-size: clamp(0.85em, 3vw, 1em);
+      font-weight: 600;
+      color: rgba(0,0,0,0.68);
+      text-align: center;
+      line-height: 1.2;
     }
 
-    /* Card themes */
-    .c-pancakes { background: linear-gradient(145deg,#FFCD7B,#FF8C42); }
-    .c-eggs     { background: linear-gradient(145deg,#FFE77A,#F4A203); }
-    .c-cereal   { background: linear-gradient(145deg,#C9B8FF,#7C5CBF); }
-    .c-toast    { background: linear-gradient(145deg,#FFDCA0,#E05C2A); }
-    .c-waffles  { background: linear-gradient(145deg,#FFB3D9,#D6006E); }
-    .c-smoothie { background: linear-gradient(145deg,#7FFFD4,#00A870); }
-    .c-bacon    { background: linear-gradient(145deg,#FF9B9B,#C0392B); }
-    .c-fruit    { background: linear-gradient(145deg,#96D7FF,#1A7FC1); }
+    /* Food-specific card gradients — warm, saturated, not primary-toy-box */
+    .bc-pancakes { background: linear-gradient(145deg, #FFCD7B, #D97B0A); }
+    .bc-eggs     { background: linear-gradient(145deg, #FFF0AA, #D4A208); }
+    .bc-cereal   { background: linear-gradient(145deg, #CEBBFF, #6830C0); }
+    .bc-toast    { background: linear-gradient(145deg, #FFCBA8, #C84210); }
+    .bc-waffles  { background: linear-gradient(145deg, #FFB0D8, #B81060); }
+    .bc-smoothie { background: linear-gradient(145deg, #88EED0, #009868); }
+    .bc-bacon    { background: linear-gradient(145deg, #FFAAAA, #B01818); }
+    .bc-fruit    { background: linear-gradient(145deg, #9ED8FF, #1068B8); }
 
-    /* ===== OVERLAY ===== */
+    /* Empty state */
+    .empty-state {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 60px 28px;
+      color: var(--k-text2);
+      text-align: center;
+    }
+    .empty-icon { font-size: 3em; }
+    .empty-state p { font-size: 16px; line-height: 1.6; }
+
+    /* ════════════════════════════════════════════════════════════════════
+       RESULT OVERLAY
+    ════════════════════════════════════════════════════════════════════ */
     #overlay {
       display: none;
       position: fixed;
       inset: 0;
       z-index: 200;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 24px;
@@ -116,7 +375,6 @@
       position: absolute;
       inset: 0;
       opacity: 0.93;
-      transition: background 0.3s;
     }
 
     #overlay-canvas {
@@ -130,11 +388,11 @@
     #overlay-card {
       position: relative;
       z-index: 10;
-      background: rgba(255,255,255,0.96);
-      border-radius: 34px;
-      padding: 44px 32px 36px;
+      background: rgba(255,252,248,0.97);
+      border-radius: 32px;
+      padding: 46px 32px 38px;
       text-align: center;
-      box-shadow: 0 32px 80px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.12);
+      box-shadow: 0 32px 80px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.12);
       max-width: 340px;
       width: 100%;
       animation: pop-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
@@ -142,488 +400,338 @@
 
     @keyframes pop-in {
       from { transform: scale(0.4) rotate(-6deg); opacity: 0; }
-      to   { transform: scale(1)   rotate(0deg);  opacity: 1; }
+      to   { transform: scale(1) rotate(0);       opacity: 1; }
     }
 
     #result-emoji {
       font-size: 5.5em;
       display: block;
       margin-bottom: 14px;
-      animation: emoji-spin 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.25s both;
+      animation: e-spin 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.25s both;
     }
-
-    @keyframes emoji-spin {
+    @keyframes e-spin {
       from { transform: scale(0) rotate(-200deg); }
-      to   { transform: scale(1) rotate(0deg); }
+      to   { transform: scale(1) rotate(0); }
     }
 
-    .result-label {
-      font-size: 0.85em;
-      color: #aaa;
-      text-transform: uppercase;
+    .res-label {
+      font-size: 11px;
+      font-weight: 600;
       letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #9E8870;
       margin-bottom: 4px;
     }
 
     #result-name {
-      font-size: 2em;
-      font-weight: bold;
-      color: #222;
-      margin-bottom: 12px;
-      text-shadow: 2px 2px 0 rgba(0,0,0,0.06);
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 2.1em;
+      font-weight: 700;
+      color: #1E140A;
+      margin-bottom: 10px;
+      line-height: 1.1;
     }
 
-    #result-message {
-      font-size: 1.05em;
-      color: #666;
-      line-height: 1.55;
+    #result-msg {
+      font-size: 15px;
+      color: #6E5840;
+      line-height: 1.6;
       margin-bottom: 30px;
     }
 
     #dismiss-btn {
-      display: inline-block;
-      padding: 17px 44px;
-      font-size: 1.15em;
-      font-family: inherit;
-      font-weight: bold;
-      color: white;
+      padding: 16px 40px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
       border: none;
-      border-radius: 50px;
+      border-radius: var(--radius-pill);
       cursor: pointer;
-      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s;
-      box-shadow: 0 6px 22px rgba(0,0,0,0.22);
-      letter-spacing: 0.03em;
+      transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+      letter-spacing: 0.01em;
     }
-    #dismiss-btn:active { transform: scale(0.93); }
+    #dismiss-btn:active { transform: scale(0.95); }
+
+    /* ── Motion ─────────────────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>🌅 Breakfast Picker!</h1>
-  <p class="subtitle">Tap your breakfast to get started!</p>
-</header>
+<!-- ─── PARENT SETUP ──────────────────────────────────────────────────── -->
+<div id="setup-view">
+  <div>
+    <div class="setup-eyebrow">Morning Setup</div>
+    <h1 class="setup-h1">What's on the menu <em>today?</em></h1>
+    <p class="setup-sub">Toggle what you have ready, then hand the iPad to the kids.</p>
+  </div>
 
-<div class="grid">
-  <div class="card c-pancakes" onclick="pick('pancakes')">
-    <span class="card-emoji">🥞</span>
-    <span class="card-name">Pancakes</span>
-  </div>
-  <div class="card c-eggs" onclick="pick('eggs')">
-    <span class="card-emoji">🍳</span>
-    <span class="card-name">Scrambled Eggs</span>
-  </div>
-  <div class="card c-cereal" onclick="pick('cereal')">
-    <span class="card-emoji">🥣</span>
-    <span class="card-name">Cereal</span>
-  </div>
-  <div class="card c-toast" onclick="pick('toast')">
-    <span class="card-emoji">🍞</span>
-    <span class="card-name">Toast & Jam</span>
-  </div>
-  <div class="card c-waffles" onclick="pick('waffles')">
-    <span class="card-emoji">🧇</span>
-    <span class="card-name">Waffles</span>
-  </div>
-  <div class="card c-smoothie" onclick="pick('smoothie')">
-    <span class="card-emoji">🥤</span>
-    <span class="card-name">Smoothie</span>
-  </div>
-  <div class="card c-bacon" onclick="pick('bacon')">
-    <span class="card-emoji">🥓</span>
-    <span class="card-name">Bacon & Eggs</span>
-  </div>
-  <div class="card c-fruit" onclick="pick('fruit')">
-    <span class="card-emoji">🍓</span>
-    <span class="card-name">Fruit Bowl</span>
+  <div class="toggle-list" id="toggle-list"></div>
+
+  <div class="setup-footer">
+    <div class="count-line" id="count-line"></div>
+    <button class="btn-go" onclick="goPickView()">Hand it to the kids →</button>
   </div>
 </div>
 
-<!-- Result overlay -->
+<!-- ─── KID PICK ──────────────────────────────────────────────────────── -->
+<div id="pick-view" class="hidden">
+  <div class="pick-header">
+    <h1 class="pick-h1"><span class="sun">🌅</span> Pick your breakfast!</h1>
+    <p class="pick-sub">Tap what you want this morning</p>
+    <button class="gear-btn" onclick="goSetupView()" aria-label="Morning setup">⚙️</button>
+  </div>
+  <div class="card-grid" id="card-grid"></div>
+</div>
+
+<!-- ─── RESULT OVERLAY ───────────────────────────────────────────────── -->
 <div id="overlay">
   <div id="overlay-bg"></div>
   <canvas id="overlay-canvas"></canvas>
   <div id="overlay-card">
     <span id="result-emoji"></span>
-    <div class="result-label">You chose…</div>
+    <div class="res-label">You chose…</div>
     <div id="result-name"></div>
-    <div id="result-message"></div>
-    <button id="dismiss-btn" onclick="dismiss()">Yummy! 😋</button>
+    <div id="result-msg"></div>
+    <button id="dismiss-btn" onclick="dismissOverlay()">Yummy! 😋</button>
   </div>
 </div>
 
 <script>
-// ─── Data ───────────────────────────────────────────────────────────────────
+// ── Menu ──────────────────────────────────────────────────────────────────────
 const MENU = {
-  pancakes: {
-    name: 'Pancakes', emoji: '🥞',
-    bg: 'linear-gradient(145deg,#FF9F43,#EE5A24)',
-    btn: '#E05020',
-    msg: 'Fluffy stacks and rivers of maple syrup! 🍯',
-    fx: 'syrup',
-  },
-  eggs: {
-    name: 'Scrambled Eggs', emoji: '🍳',
-    bg: 'linear-gradient(145deg,#FFC312,#F79F1F)',
-    btn: '#D4860A',
-    msg: 'Soft, golden and scrambled to perfection! ⭐',
-    fx: 'stars',
-  },
-  cereal: {
-    name: 'Cereal', emoji: '🥣',
-    bg: 'linear-gradient(145deg,#A29BFE,#6C5CE7)',
-    btn: '#5544CC',
-    msg: 'Snap, crackle, pop! Add extra milk! 🥛',
-    fx: 'circles',
-  },
-  toast: {
-    name: 'Toast & Jam', emoji: '🍞',
-    bg: 'linear-gradient(145deg,#FDCB6E,#E17055)',
-    btn: '#C85030',
-    msg: 'Crispy golden toast with jammy goodness! 🍓',
-    fx: 'crumbs',
-  },
-  waffles: {
-    name: 'Waffles', emoji: '🧇',
-    bg: 'linear-gradient(145deg,#FD79A8,#E84393)',
-    btn: '#C01870',
-    msg: 'Perfectly square and oh-so-syrupy! ✨',
-    fx: 'sparkles',
-  },
-  smoothie: {
-    name: 'Smoothie', emoji: '🥤',
-    bg: 'linear-gradient(145deg,#55EFC4,#00B894)',
-    btn: '#007F60',
-    msg: 'Blend it up and drink the rainbow! 🌈',
-    fx: 'bubbles',
-  },
-  bacon: {
-    name: 'Bacon & Eggs', emoji: '🥓',
-    bg: 'linear-gradient(145deg,#FF7675,#D63031)',
-    btn: '#A01818',
-    msg: 'Sizzling hot strips and sunny eggs! 🔥',
-    fx: 'sizzle',
-  },
-  fruit: {
-    name: 'Fruit Bowl', emoji: '🍓',
-    bg: 'linear-gradient(145deg,#74B9FF,#0984E3)',
-    btn: '#055FA0',
-    msg: 'Fresh, colourful and super healthy! 🌟',
-    fx: 'fruits',
-  },
+  pancakes: { name:'Pancakes',       emoji:'🥞', bg:'linear-gradient(145deg,#FFCD7B,#D97B0A)', btn:'#B86000', msg:'Fluffy stacks with rivers of maple syrup! 🍯',  fx:'syrup'    },
+  eggs:     { name:'Scrambled Eggs', emoji:'🍳', bg:'linear-gradient(145deg,#FFF0AA,#D4A208)', btn:'#A07800', msg:'Soft and golden, scrambled just right! ⭐',        fx:'stars'    },
+  cereal:   { name:'Cereal',         emoji:'🥣', bg:'linear-gradient(145deg,#CEBBFF,#6830C0)', btn:'#4818A0', msg:'Snap, crackle, pop — add extra milk! 🥛',          fx:'circles'  },
+  toast:    { name:'Toast & Jam',    emoji:'🍞', bg:'linear-gradient(145deg,#FFCBA8,#C84210)', btn:'#A82A00', msg:'Crispy golden toast with jammy goodness! 🍓',       fx:'crumbs'   },
+  waffles:  { name:'Waffles',        emoji:'🧇', bg:'linear-gradient(145deg,#FFB0D8,#B81060)', btn:'#980040', msg:'Perfectly square and oh-so-syrupy! ✨',             fx:'sparkles' },
+  smoothie: { name:'Smoothie',       emoji:'🥤', bg:'linear-gradient(145deg,#88EED0,#009868)', btn:'#007050', msg:'Blend it up and drink the rainbow! 🌈',             fx:'bubbles'  },
+  bacon:    { name:'Bacon & Eggs',   emoji:'🥓', bg:'linear-gradient(145deg,#FFAAAA,#B01818)', btn:'#901000', msg:'Sizzling hot strips and sunny eggs! 🔥',            fx:'sizzle'   },
+  fruit:    { name:'Fruit Bowl',     emoji:'🍓', bg:'linear-gradient(145deg,#9ED8FF,#1068B8)', btn:'#0048A0', msg:'Fresh, colourful, and super healthy! 🌟',           fx:'fruits'   },
 };
+const IDS = Object.keys(MENU);
+const STORE = 'bfst-available-v1';
 
-// ─── State ───────────────────────────────────────────────────────────────────
-const overlay  = document.getElementById('overlay');
-const bgEl     = document.getElementById('overlay-bg');
-const canvas   = document.getElementById('overlay-canvas');
-const ctx      = canvas.getContext('2d');
-let raf = null;
-let particles = [];
+// ── State ─────────────────────────────────────────────────────────────────────
+let available = new Set(loadAvailable());
+const firstTime = localStorage.getItem(STORE) === null;
 
-// ─── Pick / Dismiss ──────────────────────────────────────────────────────────
-function pick(id) {
-  const b = MENU[id];
-  document.getElementById('result-emoji').textContent   = b.emoji;
-  document.getElementById('result-name').textContent    = b.name;
-  document.getElementById('result-message').textContent = b.msg;
-  bgEl.style.background = b.bg;
-  document.getElementById('dismiss-btn').style.background = b.btn;
+function loadAvailable() {
+  try { const s = localStorage.getItem(STORE); if (s) return JSON.parse(s); } catch(e) {}
+  return [...IDS];
+}
+function saveAvailable() { localStorage.setItem(STORE, JSON.stringify([...available])); }
 
-  overlay.classList.add('show');
-
-  // Re-trigger animations
-  ['overlay-card', 'result-emoji'].forEach(id => {
-    const el = document.getElementById(id);
-    el.style.animation = 'none';
-    el.offsetHeight;
-    el.style.animation = '';
-  });
-
-  resizeCanvas();
-  launchFx(b.fx);
+// ── Views ─────────────────────────────────────────────────────────────────────
+function goSetupView() {
+  document.getElementById('setup-view').classList.remove('hidden');
+  document.getElementById('pick-view').classList.add('hidden');
+  renderSetup();
 }
 
-function dismiss() {
+function goPickView() {
+  saveAvailable();
+  document.getElementById('setup-view').classList.add('hidden');
+  document.getElementById('pick-view').classList.remove('hidden');
+  renderGrid();
+}
+
+// ── Setup render ─────────────────────────────────────────────────────────────
+function renderSetup() {
+  const list = document.getElementById('toggle-list');
+  list.innerHTML = '';
+  IDS.forEach(id => {
+    const b = MENU[id];
+    const on = available.has(id);
+    const row = document.createElement('div');
+    row.className = `t-row ${on ? 'on' : 'off'}`;
+    row.id = `tr-${id}`;
+    row.innerHTML = `<span class="t-emoji">${b.emoji}</span><span class="t-name">${b.name}</span><div class="t-switch"></div>`;
+    row.addEventListener('click', () => toggleItem(id));
+    list.appendChild(row);
+  });
+  updateCount();
+}
+
+function toggleItem(id) {
+  if (available.has(id)) available.delete(id); else available.add(id);
+  const row = document.getElementById(`tr-${id}`);
+  if (row) { row.classList.toggle('on', available.has(id)); row.classList.toggle('off', !available.has(id)); }
+  updateCount();
+}
+
+function updateCount() {
+  const n = available.size;
+  const el = document.getElementById('count-line');
+  if (n === 0) el.innerHTML = `No options selected yet`;
+  else el.innerHTML = `<strong>${n}</strong> option${n !== 1 ? 's' : ''} available today`;
+}
+
+// ── Grid render ───────────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('card-grid');
+  grid.innerHTML = '';
+  const ids = IDS.filter(id => available.has(id));
+  if (!ids.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">☕</div><p>Nothing set up yet.<br>Ask a grown-up to tap ⚙️!</p></div>`;
+    return;
+  }
+  ids.forEach(id => {
+    const b = MENU[id];
+    const card = document.createElement('div');
+    card.className = `bcard bc-${id}`;
+    card.innerHTML = `<span class="bcard-emoji">${b.emoji}</span><span class="bcard-name">${b.name}</span>`;
+    card.addEventListener('click', () => pickBreakfast(id));
+    grid.appendChild(card);
+  });
+}
+
+// ── Overlay ───────────────────────────────────────────────────────────────────
+const overlay   = document.getElementById('overlay');
+const overlayBg = document.getElementById('overlay-bg');
+const canvas    = document.getElementById('overlay-canvas');
+const ctx       = canvas.getContext('2d');
+let raf = null, parts = [];
+
+function pickBreakfast(id) {
+  const b = MENU[id];
+  document.getElementById('result-emoji').textContent = b.emoji;
+  document.getElementById('result-name').textContent  = b.name;
+  document.getElementById('result-msg').textContent   = b.msg;
+  overlayBg.style.background = b.bg;
+  document.getElementById('dismiss-btn').style.background = b.btn;
+  overlay.classList.add('show');
+  ['overlay-card','result-emoji'].forEach(eid => {
+    const el = document.getElementById(eid);
+    el.style.animation = 'none'; el.offsetHeight; el.style.animation = '';
+  });
+  resizeCanvas(); launchFx(b.fx);
+}
+
+function dismissOverlay() {
   overlay.classList.remove('show');
   if (raf) { cancelAnimationFrame(raf); raf = null; }
-  particles = [];
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  parts = []; ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-// ─── Canvas helpers ───────────────────────────────────────────────────────────
-function resizeCanvas() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
+function resizeCanvas() { canvas.width = innerWidth; canvas.height = innerHeight; }
 
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.update();
-    p.draw(ctx);
-    if (p.dead) particles.splice(i, 1);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.update(); p.draw(ctx);
+    if (p.dead) parts.splice(i, 1);
   }
   raf = requestAnimationFrame(loop);
 }
 
-function launchFx(type) {
-  if (raf) cancelAnimationFrame(raf);
-  particles = [];
-  FX[type]();
-  loop();
-}
+function launchFx(type) { if(raf) cancelAnimationFrame(raf); parts=[]; FX[type](); loop(); }
 
-// ─── Particle factories ───────────────────────────────────────────────────────
+// ── Particle systems ──────────────────────────────────────────────────────────
+const TAU=Math.PI*2, C=Math.cos, S=Math.sin;
+const r=(a,b)=>a+Math.random()*(b-a);
+const p1=a=>a[0|Math.random()*a.length];
+const later=(ms,fn)=>setTimeout(fn,ms);
+const sp=p=>{p.dead=false;parts.push(p);};
+
 const FX = {
-
-  // 🥞 Pancakes – golden syrup drops fall from above
+  // 🥞 Syrup drops fall from above
   syrup() {
-    const cols = ['#8B4513','#CD853F','#D2691E','#A0522D','#DAA520','#C68642'];
-    for (let i = 0; i < 70; i++) {
-      delay(i * 55, () => {
-        spawn({
-          x: rnd(0, canvas.width), y: rnd(-80, -10),
-          w: rnd(4, 12), h: rnd(18, 36),
-          vx: rnd(-1, 1), vy: rnd(3, 7),
-          color: pick1(cols), alpha: rnd(0.7, 1),
-          update() { this.x += this.vx; this.y += this.vy; if (this.y > canvas.height + 60) this.dead = true; },
-          draw(c) {
-            c.globalAlpha = this.alpha;
-            c.fillStyle = this.color;
-            c.beginPath();
-            c.ellipse(this.x, this.y, this.w / 2, this.h / 2, 0.2, 0, TAU);
-            c.fill();
-            c.globalAlpha = 1;
-          },
-        });
-      });
-    }
+    const cols=['#7A3A10','#C07030','#C06028','#906020','#C8A030'];
+    for(let i=0;i<70;i++) later(i*55,()=>sp({
+      x:r(0,canvas.width), y:r(-80,-10), w:r(4,12), h:r(18,36),
+      vx:r(-1,1), vy:r(3,7), color:p1(cols), alpha:r(.7,1),
+      update(){this.x+=this.vx;this.y+=this.vy;if(this.y>canvas.height+60)this.dead=true;},
+      draw(c){c.globalAlpha=this.alpha;c.fillStyle=this.color;c.beginPath();c.ellipse(this.x,this.y,this.w/2,this.h/2,.2,0,TAU);c.fill();c.globalAlpha=1;}
+    }));
   },
 
-  // 🍳 Eggs – yellow stars burst from centre
+  // 🍳 Stars burst from centre
   stars() {
-    const cols = ['#FFD700','#FFA500','#FFFF33','#FFE066','#FFF176'];
-    const cx = canvas.width / 2, cy = canvas.height / 2;
-    for (let i = 0; i < 55; i++) {
-      const angle = rnd(0, TAU), spd = rnd(3, 10);
-      spawn({
-        x: cx, y: cy,
-        vx: cos(angle) * spd, vy: sin(angle) * spd,
-        size: rnd(10, 22), color: pick1(cols),
-        rot: rnd(0, TAU), rotV: rnd(-0.3, 0.3),
-        alpha: 1, gravity: 0.18,
-        update() {
-          this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
-          this.rot += this.rotV; this.alpha -= 0.013;
-          if (this.alpha <= 0) this.dead = true;
-        },
-        draw(c) {
-          c.save(); c.globalAlpha = this.alpha;
-          c.translate(this.x, this.y); c.rotate(this.rot);
-          c.fillStyle = this.color;
-          star5(c, 0, 0, this.size, this.size * 0.45); c.fill();
-          c.restore();
-        },
-      });
-    }
+    const cols=['#FFD700','#FFA500','#FFEE44','#FFE066'];
+    const cx=canvas.width/2,cy=canvas.height/2;
+    for(let i=0;i<55;i++){const a=r(0,TAU),spd=r(3,10);sp({x:cx,y:cy,vx:C(a)*spd,vy:S(a)*spd,size:r(10,22),color:p1(cols),rot:r(0,TAU),rotV:r(-.3,.3),alpha:1,grav:.18,
+      update(){this.vy+=this.grav;this.x+=this.vx;this.y+=this.vy;this.rot+=this.rotV;this.alpha-=.013;if(this.alpha<=0)this.dead=true;},
+      draw(c){c.save();c.globalAlpha=this.alpha;c.translate(this.x,this.y);c.rotate(this.rot);c.fillStyle=this.color;star5(c,0,0,this.size,this.size*.45);c.fill();c.restore();}
+    });}
   },
 
-  // 🥣 Cereal – colourful Os rain down
+  // 🥣 Coloured Os rain down
   circles() {
-    const cols = ['#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#FFD93D','#A29BFE','#FF9FF3'];
-    for (let i = 0; i < 90; i++) {
-      delay(i * 35, () => {
-        spawn({
-          x: rnd(0, canvas.width), y: rnd(-100, -8),
-          vx: rnd(-2.5, 2.5), vy: rnd(2, 5),
-          r: rnd(7, 16), color: pick1(cols), lw: rnd(3, 5),
-          rot: rnd(0, TAU), rotV: rnd(-0.12, 0.12),
-          update() {
-            this.x += this.vx; this.y += this.vy; this.rot += this.rotV;
-            if (this.y > canvas.height + 30) this.dead = true;
-          },
-          draw(c) {
-            c.save(); c.translate(this.x, this.y); c.rotate(this.rot);
-            c.strokeStyle = this.color; c.lineWidth = this.lw;
-            c.beginPath(); c.arc(0, 0, this.r, 0, TAU); c.stroke();
-            c.restore();
-          },
-        });
-      });
-    }
+    const cols=['#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#FFD93D','#A29BFE','#FF9FF3'];
+    for(let i=0;i<90;i++) later(i*35,()=>sp({
+      x:r(0,canvas.width),y:r(-100,-8),vx:r(-2.5,2.5),vy:r(2,5),radius:r(7,16),color:p1(cols),lw:r(3,5),rot:r(0,TAU),rotV:r(-.12,.12),
+      update(){this.x+=this.vx;this.y+=this.vy;this.rot+=this.rotV;if(this.y>canvas.height+30)this.dead=true;},
+      draw(c){c.save();c.translate(this.x,this.y);c.rotate(this.rot);c.strokeStyle=this.color;c.lineWidth=this.lw;c.beginPath();c.arc(0,0,this.radius,0,TAU);c.stroke();c.restore();}
+    }));
   },
 
-  // 🍞 Toast – crumbs explode in 4 waves from card centre
+  // 🍞 Crumbs explode in waves
   crumbs() {
-    const cols = ['#D2691E','#8B4513','#A0522D','#CD853F','#DEB887','#F4A460'];
-    const cx = canvas.width / 2, cy = canvas.height * 0.42;
-    for (let wave = 0; wave < 5; wave++) {
-      delay(wave * 260, () => {
-        for (let i = 0; i < 18; i++) {
-          const angle = rnd(0, TAU), spd = rnd(4, 13);
-          spawn({
-            x: cx + rnd(-30, 30), y: cy + rnd(-30, 30),
-            vx: cos(angle) * spd, vy: sin(angle) * spd - 4,
-            size: rnd(3, 9), color: pick1(cols),
-            gravity: 0.45, rot: rnd(0, TAU), rotV: rnd(-0.4, 0.4), alpha: 1,
-            update() {
-              this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
-              this.vx *= 0.98; this.rot += this.rotV;
-              if (this.y > canvas.height + 20) this.dead = true;
-            },
-            draw(c) {
-              c.save(); c.globalAlpha = this.alpha; c.fillStyle = this.color;
-              c.translate(this.x, this.y); c.rotate(this.rot);
-              c.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
-              c.restore();
-            },
-          });
-        }
-      });
-    }
+    const cols=['#D2691E','#8B4513','#A0522D','#CD853F','#DEB887'];
+    const cx=canvas.width/2,cy=canvas.height*.42;
+    for(let w=0;w<5;w++) later(w*260,()=>{
+      for(let i=0;i<18;i++){const a=r(0,TAU),spd=r(4,13);sp({x:cx+r(-30,30),y:cy+r(-30,30),vx:C(a)*spd,vy:S(a)*spd-4,size:r(3,9),color:p1(cols),grav:.45,rot:r(0,TAU),rotV:r(-.4,.4),alpha:1,
+        update(){this.vy+=this.grav;this.x+=this.vx;this.y+=this.vy;this.vx*=.98;this.rot+=this.rotV;if(this.y>canvas.height+20)this.dead=true;},
+        draw(c){c.save();c.globalAlpha=this.alpha;c.fillStyle=this.color;c.translate(this.x,this.y);c.rotate(this.rot);c.fillRect(-this.size/2,-this.size/2,this.size,this.size);c.restore();}
+      });}
+    });
   },
 
-  // 🧇 Waffles – diamond sparkles appear and fade all over screen
+  // 🧇 Diamond sparkles appear and fade
   sparkles() {
-    const cols = ['#FFD700','#FF69B4','#FF1493','#FFB6C1','#FFFACD','#FFE4E1'];
-    let count = 0;
-    (function addNext() {
-      if (!overlay.classList.contains('show') || count >= 150) return;
-      count++;
-      spawn({
-        x: rnd(0, canvas.width), y: rnd(0, canvas.height),
-        size: rnd(6, 24), color: pick1(cols),
-        rot: rnd(0, TAU), alpha: 0, phase: 'in',
-        spd: rnd(0.035, 0.07),
-        update() {
-          if (this.phase === 'in') { this.alpha += this.spd; if (this.alpha >= 1) { this.alpha = 1; this.phase = 'out'; } }
-          else { this.alpha -= this.spd * 0.65; if (this.alpha <= 0) this.dead = true; }
-        },
-        draw(c) {
-          c.save(); c.globalAlpha = this.alpha; c.fillStyle = this.color;
-          c.translate(this.x, this.y); c.rotate(this.rot);
-          const s = this.size;
-          c.beginPath();
-          c.moveTo(0, -s); c.quadraticCurveTo(s * 0.18, -s * 0.18, s, 0);
-          c.quadraticCurveTo(s * 0.18,  s * 0.18, 0, s);
-          c.quadraticCurveTo(-s * 0.18, s * 0.18, -s, 0);
-          c.quadraticCurveTo(-s * 0.18, -s * 0.18, 0, -s);
-          c.fill(); c.restore();
-        },
+    const cols=['#FFD700','#FF69B4','#FF1493','#FFB6C1','#FFFACD'];
+    let count=0;
+    (function add(){
+      if(!overlay.classList.contains('show')||count>=150)return; count++;
+      sp({x:r(0,canvas.width),y:r(0,canvas.height),size:r(6,24),color:p1(cols),rot:r(0,TAU),alpha:0,phase:'in',spd:r(.035,.07),
+        update(){if(this.phase==='in'){this.alpha+=this.spd;if(this.alpha>=1){this.alpha=1;this.phase='out';}}else{this.alpha-=this.spd*.65;if(this.alpha<=0)this.dead=true;}},
+        draw(c){const s=this.size;c.save();c.globalAlpha=this.alpha;c.fillStyle=this.color;c.translate(this.x,this.y);c.rotate(this.rot);c.beginPath();c.moveTo(0,-s);c.quadraticCurveTo(s*.18,-s*.18,s,0);c.quadraticCurveTo(s*.18,s*.18,0,s);c.quadraticCurveTo(-s*.18,s*.18,-s,0);c.quadraticCurveTo(-s*.18,-s*.18,0,-s);c.fill();c.restore();}
       });
-      setTimeout(addNext, rnd(80, 180));
+      setTimeout(add,r(80,180));
     })();
   },
 
-  // 🥤 Smoothie – coloured bubbles float up from bottom
+  // 🥤 Bubbles float up
   bubbles() {
-    const cols = ['#55EFC4','#00CEC9','#FDCB6E','#A29BFE','#FD79A8','#74B9FF','#FFD93D'];
-    for (let i = 0; i < 90; i++) {
-      delay(i * 70 + rnd(0, 50), () => {
-        const r = rnd(9, 32);
-        spawn({
-          x: rnd(0, canvas.width), y: canvas.height + r,
-          r, color: pick1(cols), alpha: rnd(0.35, 0.75),
-          vy: -(rnd(1.5, 3.5)), vx: rnd(-0.5, 0.5),
-          wobble: rnd(0, TAU), wobV: rnd(0.04, 0.09),
-          update() {
-            this.wobble += this.wobV;
-            this.x += sin(this.wobble) * 1.8 + this.vx;
-            this.y += this.vy;
-            if (this.y < -this.r * 2) this.dead = true;
-          },
-          draw(c) {
-            c.globalAlpha = this.alpha; c.fillStyle = this.color;
-            c.beginPath(); c.arc(this.x, this.y, this.r, 0, TAU); c.fill();
-            c.globalAlpha = this.alpha * 0.55; c.fillStyle = 'white';
-            c.beginPath(); c.arc(this.x - this.r * 0.28, this.y - this.r * 0.28, this.r * 0.24, 0, TAU); c.fill();
-            c.globalAlpha = 1;
-          },
-        });
-      });
-    }
+    const cols=['#55EFC4','#00CEC9','#FDCB6E','#A29BFE','#FD79A8','#74B9FF'];
+    for(let i=0;i<90;i++) later(i*70+r(0,50),()=>{const rad=r(9,32);sp({x:r(0,canvas.width),y:canvas.height+rad,rad,color:p1(cols),alpha:r(.35,.72),vy:-(r(1.5,3.5)),vx:r(-.5,.5),wob:r(0,TAU),wobV:r(.04,.09),
+      update(){this.wob+=this.wobV;this.x+=S(this.wob)*1.8+this.vx;this.y+=this.vy;if(this.y<-this.rad*2)this.dead=true;},
+      draw(c){c.globalAlpha=this.alpha;c.fillStyle=this.color;c.beginPath();c.arc(this.x,this.y,this.rad,0,TAU);c.fill();c.globalAlpha=this.alpha*.55;c.fillStyle='#fff';c.beginPath();c.arc(this.x-this.rad*.28,this.y-this.rad*.28,this.rad*.24,0,TAU);c.fill();c.globalAlpha=1;}
+    });});
   },
 
-  // 🥓 Bacon – hot embers drift upward with a wavy sizzle
+  // 🥓 Hot embers sizzle upward
   sizzle() {
-    const cols = ['#FF4500','#FF6348','#FF7F50','#FFA502','#FF6B6B','#C0392B'];
-    for (let i = 0; i < 120; i++) {
-      delay(i * 40, () => {
-        spawn({
-          x: rnd(0, canvas.width),
-          y: canvas.height * 0.55 + rnd(0, canvas.height * 0.45),
-          vx: rnd(-1.2, 1.2), vy: -(rnd(1.2, 4)),
-          size: rnd(3, 9), color: pick1(cols), alpha: 0.85,
-          wobble: rnd(0, TAU), wobV: rnd(0.1, 0.2),
-          update() {
-            this.wobble += this.wobV;
-            this.x += sin(this.wobble) * 2.5 + this.vx;
-            this.y += this.vy; this.alpha -= 0.012; this.size *= 1.01;
-            if (this.alpha <= 0) this.dead = true;
-          },
-          draw(c) {
-            c.globalAlpha = this.alpha; c.fillStyle = this.color;
-            c.beginPath(); c.arc(this.x, this.y, this.size, 0, TAU); c.fill();
-            c.globalAlpha = 1;
-          },
-        });
-      });
-    }
+    const cols=['#FF4500','#FF6348','#FF7F50','#FFA502','#FF6B6B'];
+    for(let i=0;i<120;i++) later(i*40,()=>sp({x:r(0,canvas.width),y:canvas.height*.55+r(0,canvas.height*.45),vx:r(-1.2,1.2),vy:-(r(1.2,4)),size:r(3,9),color:p1(cols),alpha:.85,wob:r(0,TAU),wobV:r(.1,.2),
+      update(){this.wob+=this.wobV;this.x+=S(this.wob)*2.5+this.vx;this.y+=this.vy;this.alpha-=.012;this.size*=1.01;if(this.alpha<=0)this.dead=true;},
+      draw(c){c.globalAlpha=this.alpha;c.fillStyle=this.color;c.beginPath();c.arc(this.x,this.y,this.size,0,TAU);c.fill();c.globalAlpha=1;}
+    }));
   },
 
-  // 🍓 Fruit – emoji fruits explode outward from centre
+  // 🍓 Fruit emojis explode outward
   fruits() {
-    const list = ['🍓','🍊','🍋','🍇','🍍','🥝','🍒','🍑','🍎','🫐','🍌','🍉'];
-    const cx = canvas.width / 2, cy = canvas.height * 0.45;
-    for (let i = 0; i < 36; i++) {
-      delay(i * 80 + rnd(0, 60), () => {
-        const angle = rnd(0, TAU), spd = rnd(5, 14);
-        spawn({
-          x: cx, y: cy,
-          vx: cos(angle) * spd, vy: sin(angle) * spd - 5,
-          emoji: pick1(list), size: rnd(22, 38),
-          gravity: 0.32, rot: rnd(-0.4, 0.4), rotV: rnd(-0.08, 0.08), alpha: 1,
-          update() {
-            this.vy += this.gravity; this.x += this.vx; this.y += this.vy;
-            this.vx *= 0.99; this.rot += this.rotV;
-            if (this.y > canvas.height + 60) this.dead = true;
-          },
-          draw(c) {
-            c.save(); c.globalAlpha = this.alpha;
-            c.translate(this.x, this.y); c.rotate(this.rot);
-            c.font = `${this.size}px serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-            c.fillText(this.emoji, 0, 0);
-            c.restore();
-          },
-        });
-      });
-    }
+    const list=['🍓','🍊','🍋','🍇','🍍','🥝','🍒','🍑','🍎','🫐','🍌','🍉'];
+    const cx=canvas.width/2,cy=canvas.height*.45;
+    for(let i=0;i<36;i++) later(i*80+r(0,60),()=>{const a=r(0,TAU),spd=r(5,14);sp({x:cx,y:cy,vx:C(a)*spd,vy:S(a)*spd-5,emoji:p1(list),size:r(22,38),grav:.32,rot:r(-.4,.4),rotV:r(-.08,.08),alpha:1,
+      update(){this.vy+=this.grav;this.x+=this.vx;this.y+=this.vy;this.vx*=.99;this.rot+=this.rotV;if(this.y>canvas.height+60)this.dead=true;},
+      draw(c){c.save();c.globalAlpha=this.alpha;c.translate(this.x,this.y);c.rotate(this.rot);c.font=`${this.size}px serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(this.emoji,0,0);c.restore();}
+    });});
   },
 };
 
-// ─── Util ─────────────────────────────────────────────────────────────────────
-const TAU = Math.PI * 2;
-const cos = Math.cos, sin = Math.sin;
-const rnd = (a, b) => a + Math.random() * (b - a);
-const pick1 = arr => arr[Math.floor(Math.random() * arr.length)];
-const delay = (ms, fn) => { if (overlay.classList.contains('show') || ms === 0) setTimeout(fn, ms); };
-const spawn = p => { p.dead = false; particles.push(p); };
+function star5(c,cx,cy,r,ir){let rot=-Math.PI/2;const s=Math.PI/5;c.beginPath();c.moveTo(cx+C(rot)*r,cy+S(rot)*r);for(let i=0;i<5;i++){rot+=s;c.lineTo(cx+C(rot)*ir,cy+S(rot)*ir);rot+=s;c.lineTo(cx+C(rot)*r,cy+S(rot)*r);}c.closePath();}
 
-function star5(c, cx, cy, r, ir) {
-  let rot = -Math.PI / 2;
-  const step = Math.PI / 5;
-  c.beginPath(); c.moveTo(cx + cos(rot) * r, cy + sin(rot) * r);
-  for (let i = 0; i < 5; i++) {
-    rot += step; c.lineTo(cx + cos(rot) * ir, cy + sin(rot) * ir);
-    rot += step; c.lineTo(cx + cos(rot) * r,  cy + sin(rot) * r);
-  }
-  c.closePath();
-}
+window.addEventListener('resize',()=>{if(overlay.classList.contains('show'))resizeCanvas();});
+overlay.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
 
-window.addEventListener('resize', () => { if (overlay.classList.contains('show')) resizeCanvas(); });
-overlay.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (firstTime) goSetupView(); else goPickView();
 </script>
 </body>
 </html>
