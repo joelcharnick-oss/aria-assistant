@@ -167,7 +167,7 @@ app.post('/api/insights', async (req, res) => {
     res.json({ insight: response.content[0].text });
   } catch (err) {
     console.error('Insights error:', err.message);
-    res.status(500).json({ error: 'Could not generate insights right now — try again in a moment.' });
+    res.status(500).json({ error: `Error: ${err.message}` });
   }
 });
 
