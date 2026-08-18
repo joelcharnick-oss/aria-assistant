@@ -251,8 +251,7 @@
 
   <div class="s-footer">
     <div class="count-line" id="count-line"></div>
-    <button class="btn-go" onclick="goWho()">Hand to kids →</button>
-    <button class="btn-outline" onclick="doReset()">Reset for tomorrow</button>
+    <button class="btn-go" onclick="resetAndGo()">Reset &amp; hand to kids →</button>
   </div>
 </div>
 
@@ -1028,11 +1027,12 @@ function updateCount() {
     n ? `<strong>${n}</strong> item${n!==1?'s':''} on today's menu` : `No items on today's menu`;
 }
 
-function doReset() {
+function resetAndGo() {
+  syncKidsFromDOM();
   choices = {}; activeSubopts = {};
-  save.choices(); save.activeSubopts();
-  renderChoices(); renderWho(); renderMenu(); showAddBtn(); updateCount();
-  toast('Choices cleared for tomorrow');
+  save.choices(); save.activeSubopts(); save.active(); save.kids();
+  renderWho();
+  show('v-who');
 }
 
 // ── Who ────────────────────────────────────────────────────────────────────────
