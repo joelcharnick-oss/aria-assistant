@@ -172,6 +172,11 @@
     .subopt-chip:active{background:rgba(80,160,80,.15);border-color:#3A8C50;color:#1E5A30;}
     .subopt-skip{display:block;width:100%;padding:13px;font-family:inherit;font-size:14px;color:var(--k-text2);background:transparent;border:1.5px solid rgba(0,0,0,.12);border-radius:var(--rPill);cursor:pointer;text-align:center;}
     .bc-subopt{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:20px;font-size:10px;font-weight:700;color:#1E5A30;padding:2px 8px;white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
+    /* Sub-option chips in menu list */
+    .t-subopts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+    .t-soChip{font-size:11px;padding:3px 9px;border-radius:10px;border:1.5px solid transparent;cursor:pointer;font-family:inherit;font-weight:600;line-height:1.4;transition:background .15s,color .15s,border-color .15s;}
+    .t-soChip.on{background:rgba(78,170,128,.18);color:#2A6A50;border-color:rgba(78,170,128,.4);}
+    .t-soChip.off{background:var(--p-edge);color:var(--p-text3);text-decoration:line-through;}
     /* Sub-option config in setup */
     .subopts-cfg{margin-top:10px;padding-top:10px;border-top:1px solid var(--p-edge);}
     .subopts-cfg-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--p-text3);margin-bottom:6px;}
@@ -467,8 +472,8 @@ const KPASTEL = [
 ];
 
 // ── Storage ────────────────────────────────────────────────────────────────────
-const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1' };
-let items, active, choices, kids, history;
+const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1', activeSubopts:'bf-activesubopts-v1' };
+let items, active, choices, kids, history, activeSubopts;
 let serverAvailable = false;
 let historyExpanded = false;
 let _sheetOpts = [];
@@ -484,15 +489,17 @@ function applyState(data) {
   } else {
     try { const a = JSON.parse(localStorage.getItem(SK.active)); active = new Set(a || Object.keys(items)); } catch(e){ active = new Set(Object.keys(items)); }
   }
-  choices = data.choices || (() => { try { return JSON.parse(localStorage.getItem(SK.choices)) || {}; } catch(e){ return {}; } })();
-  kids    = data.kids    || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))    || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
-  history = data.history || (() => { try { return JSON.parse(localStorage.getItem(SK.history)) || []; } catch(e){ return []; } })();
+  choices      = data.choices      || (() => { try { return JSON.parse(localStorage.getItem(SK.choices))      || {}; } catch(e){ return {}; } })();
+  kids         = data.kids         || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))         || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
+  history      = data.history      || (() => { try { return JSON.parse(localStorage.getItem(SK.history))      || []; } catch(e){ return []; } })();
+  activeSubopts = data.activeSubopts || (() => { try { return JSON.parse(localStorage.getItem(SK.activeSubopts)) || {}; } catch(e){ return {}; } })();
   // Mirror to localStorage for offline fallback
-  localStorage.setItem(SK.items,   JSON.stringify(items));
-  localStorage.setItem(SK.active,  JSON.stringify([...active]));
-  localStorage.setItem(SK.choices, JSON.stringify(choices));
-  localStorage.setItem(SK.kids,    JSON.stringify(kids));
-  localStorage.setItem(SK.history, JSON.stringify(history));
+  localStorage.setItem(SK.items,        JSON.stringify(items));
+  localStorage.setItem(SK.active,       JSON.stringify([...active]));
+  localStorage.setItem(SK.choices,      JSON.stringify(choices));
+  localStorage.setItem(SK.kids,         JSON.stringify(kids));
+  localStorage.setItem(SK.history,      JSON.stringify(history));
+  localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts));
 }
 
 async function load() {
@@ -519,16 +526,17 @@ function pushToServer() {
   fetch('/api/breakfast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, active: [...active], choices, kids, history }),
+    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts }),
   }).catch(() => {});
 }
 
 const save = {
-  items()  { localStorage.setItem(SK.items,   JSON.stringify(items));        pushToServer(); },
-  active() { localStorage.setItem(SK.active,  JSON.stringify([...active]));  pushToServer(); },
-  choices(){ localStorage.setItem(SK.choices, JSON.stringify(choices));       pushToServer(); },
-  kids()   { localStorage.setItem(SK.kids,    JSON.stringify(kids));          pushToServer(); },
-  history(){ localStorage.setItem(SK.history, JSON.stringify(history));       pushToServer(); },
+  items()       { localStorage.setItem(SK.items,        JSON.stringify(items));         pushToServer(); },
+  active()      { localStorage.setItem(SK.active,       JSON.stringify([...active]));   pushToServer(); },
+  choices()     { localStorage.setItem(SK.choices,      JSON.stringify(choices));        pushToServer(); },
+  kids()        { localStorage.setItem(SK.kids,         JSON.stringify(kids));           pushToServer(); },
+  history()     { localStorage.setItem(SK.history,      JSON.stringify(history));        pushToServer(); },
+  activeSubopts(){ localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts)); pushToServer(); },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -848,7 +856,10 @@ function renderMenu() {
       <button class="t-action-btn del" onclick="delItem('${id}',event)" title="Remove">–</button>
       <button class="t-action-btn" onclick="showEditForm('${id}',event)" title="Edit">✏️</button>
       <span class="t-emoji">${item.emoji}</span>
-      <span class="t-name">${esc(item.name)}</span>
+      <div style="flex:1;min-width:0">
+        <div class="t-name">${esc(item.name)}</div>
+        ${item.subopts?.length ? `<div class="t-subopts" id="tso-${id}">${suboptChipsHTML(id)}</div>` : ''}
+      </div>
       <div class="t-sw"></div>`;
     row.addEventListener('click', e => {
       if (!e.target.closest('.t-action-btn')) toggleItem(id);
@@ -961,6 +972,34 @@ function confirmEdit(id) {
 }
 
 // ── Menu helpers ───────────────────────────────────────────────────────────────
+function suboptChipsHTML(id) {
+  return (items[id]?.subopts || []).map((opt, i) => {
+    const isOn = !activeSubopts[id] || activeSubopts[id].includes(opt);
+    return `<button class="t-soChip ${isOn?'on':'off'}" onclick="toggleSubopt('${id}',${i},event)">${esc(opt)}</button>`;
+  }).join('');
+}
+
+function toggleSubopt(id, idx, e) {
+  e.stopPropagation();
+  const opt = items[id]?.subopts?.[idx];
+  if (!opt) return;
+  const allOpts = items[id].subopts;
+  if (!activeSubopts[id]) {
+    activeSubopts[id] = allOpts.filter(o => o !== opt);
+  } else {
+    const i = activeSubopts[id].indexOf(opt);
+    if (i >= 0) {
+      activeSubopts[id].splice(i, 1);
+    } else {
+      activeSubopts[id].push(opt);
+      if (activeSubopts[id].length >= allOpts.length) delete activeSubopts[id];
+    }
+  }
+  save.activeSubopts();
+  const wrap = document.getElementById(`tso-${id}`);
+  if (wrap) wrap.innerHTML = suboptChipsHTML(id);
+}
+
 function toggleItem(id) {
   if (active.has(id)) active.delete(id); else active.add(id);
   const row = document.getElementById(`tr-${id}`);
@@ -990,8 +1029,9 @@ function updateCount() {
 }
 
 function doReset() {
-  choices = {}; save.choices();
-  renderChoices(); renderWho();
+  choices = {}; activeSubopts = {};
+  save.choices(); save.activeSubopts();
+  renderChoices(); renderWho(); renderMenu(); showAddBtn(); updateCount();
   toast('Choices cleared for tomorrow');
 }
 
@@ -1093,7 +1133,15 @@ function pickItem(id) {
 
 function showSuboptSheet(id) {
   const item = items[id];
-  _sheetOpts = item.subopts || [];
+  const allOpts = item.subopts || [];
+  _sheetOpts = activeSubopts[id] ? activeSubopts[id].filter(o => allOpts.includes(o)) : allOpts;
+  if (!_sheetOpts.length) {
+    currentSelections.add(id);
+    const card = document.getElementById(`bc-${id}`);
+    if (card) card.classList.add('sel');
+    updateDoneBtn();
+    return;
+  }
   const sheet = document.getElementById('subopt-sheet');
   const dimmer = document.getElementById('subopt-dimmer');
   sheet.innerHTML = `
@@ -1172,9 +1220,9 @@ function renderPendingSuboptsCfg() {
 }
 function addPendingSubopt() {
   const inp = document.getElementById('add-subopt-inp');
-  const v = inp?.value.trim();
-  if (!v || pendingSubopts.includes(v)) return;
-  pendingSubopts.push(v);
+  const parts = (inp?.value || '').split(',').map(v=>v.trim()).filter(v=>v && !pendingSubopts.includes(v));
+  if (!parts.length) return;
+  pendingSubopts.push(...parts);
   inp.value = '';
   renderPendingSuboptsCfg();
 }
@@ -1192,11 +1240,12 @@ function renderEditSuboptsCfg(id) {
 }
 function addEditSubopt(id) {
   const inp = document.getElementById(`subopt-inp-${id}`);
-  const v = inp?.value.trim();
-  if (!v) return;
   if (!items[id].subopts) items[id].subopts = [];
-  if (!items[id].subopts.includes(v)) { items[id].subopts.push(v); renderEditSuboptsCfg(id); }
+  const parts = (inp?.value || '').split(',').map(v=>v.trim()).filter(v=>v && !items[id].subopts.includes(v));
+  if (!parts.length) return;
+  items[id].subopts.push(...parts);
   inp.value = '';
+  renderEditSuboptsCfg(id);
 }
 function removeEditSubopt(id, i) {
   if (!items[id]?.subopts) return;
@@ -1252,9 +1301,9 @@ function toast(msg){
 // Re-sync when the app is brought back into focus on any device
 document.addEventListener('visibilitychange', async () => {
   if (document.hidden) return;
-  const before = JSON.stringify({ items, active: [...active], choices, kids });
+  const before = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
   await load();
-  const after = JSON.stringify({ items, active: [...active], choices, kids });
+  const after = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
   if (before === after) return;
   // State changed — re-render current view
   const cur = ['v-setup','v-who','v-pick'].find(v => !document.getElementById(v).classList.contains('hidden'));
