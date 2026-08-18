@@ -1008,12 +1008,14 @@ function toggleItem(id) {
 
 function delItem(id, e) {
   e.stopPropagation();
+  if (!confirm(`Remove "${items[id]?.name}" from the menu?`)) return;
   delete items[id]; active.delete(id);
   save.items(); save.active();
   renderMenu(); showAddBtn(); updateCount();
 }
 
 function restoreDefaults() {
+  if (!confirm('Restore all default breakfast items? Your custom items will stay.')) return;
   Object.assign(items, clone(DEFAULTS));
   Object.keys(DEFAULTS).forEach(id => active.add(id));
   save.items(); save.active();
