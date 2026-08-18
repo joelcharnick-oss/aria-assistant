@@ -61,6 +61,15 @@
     .c-time{font-size:11px;color:var(--p-text3);white-space:nowrap;}
     .no-choices{font-size:14px;color:var(--p-text3);padding:10px 0;}
 
+    /* History */
+    .h-scroll{max-height:260px;overflow-y:auto;}
+    .h-group{margin-bottom:6px;}
+    .h-date{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--p-text3);padding:8px 0 4px;}
+    .h-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--p-surf);border:1px solid var(--p-edge);border-radius:8px;margin-bottom:2px;}
+    .h-val{font-size:13px;color:var(--p-text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .h-name{font-size:13px;font-weight:600;color:var(--p-text);min-width:48px;}
+    .h-time{font-size:11px;color:var(--p-text3);white-space:nowrap;flex-shrink:0;}
+
     /* Toggle list */
     .t-list{display:flex;flex-direction:column;gap:2px;}
     .t-row{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--p-surf);border:1px solid var(--p-edge);border-radius:8px;cursor:pointer;user-select:none;position:relative;transition:background .1s;}
@@ -191,6 +200,14 @@
   <div class="s-sec">
     <div class="s-sec-head"><span class="s-sec-label">Today's choices</span></div>
     <div id="choices-display"></div>
+  </div>
+
+  <div class="s-sec">
+    <div class="s-sec-head">
+      <span class="s-sec-label">Breakfast history</span>
+      <button class="s-sec-action" onclick="clearHistory()">Clear all</button>
+    </div>
+    <div class="h-scroll" id="history-list"></div>
   </div>
 
   <div class="s-sec">
@@ -421,8 +438,8 @@ const KPASTEL = [
 ];
 
 // ── Storage ────────────────────────────────────────────────────────────────────
-const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4' };
-let items, active, choices, kids;
+const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1' };
+let items, active, choices, kids, history;
 let serverAvailable = false;
 
 function applyState(data) {
@@ -438,11 +455,13 @@ function applyState(data) {
   }
   choices = data.choices || (() => { try { return JSON.parse(localStorage.getItem(SK.choices)) || {}; } catch(e){ return {}; } })();
   kids    = data.kids    || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))    || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
+  history = data.history || (() => { try { return JSON.parse(localStorage.getItem(SK.history)) || []; } catch(e){ return []; } })();
   // Mirror to localStorage for offline fallback
   localStorage.setItem(SK.items,   JSON.stringify(items));
   localStorage.setItem(SK.active,  JSON.stringify([...active]));
   localStorage.setItem(SK.choices, JSON.stringify(choices));
   localStorage.setItem(SK.kids,    JSON.stringify(kids));
+  localStorage.setItem(SK.history, JSON.stringify(history));
 }
 
 async function load() {
@@ -466,7 +485,7 @@ function pushToServer() {
   fetch('/api/breakfast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, active: [...active], choices, kids }),
+    body: JSON.stringify({ items, active: [...active], choices, kids, history }),
   }).catch(() => {});
 }
 
@@ -475,6 +494,7 @@ const save = {
   active() { localStorage.setItem(SK.active,  JSON.stringify([...active]));  pushToServer(); },
   choices(){ localStorage.setItem(SK.choices, JSON.stringify(choices));       pushToServer(); },
   kids()   { localStorage.setItem(SK.kids,    JSON.stringify(kids));          pushToServer(); },
+  history(){ localStorage.setItem(SK.history, JSON.stringify(history));       pushToServer(); },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -563,7 +583,16 @@ function donePicking() {
   choices[currentKid] = { itemIds: [...currentSelections], time: t };
   save.choices();
 
-  const citems = [...currentSelections].map(id => items[id]).filter(Boolean);
+  const selectedIds = [...currentSelections];
+  const citems = selectedIds.map(id => items[id]).filter(Boolean);
+  // Append to permanent history with a snapshot so deleted items still show
+  history.push({
+    kid: currentKid,
+    itemIds: selectedIds,
+    snapshot: Object.fromEntries(selectedIds.map(id => [id, { name: items[id]?.name, emoji: items[id]?.emoji }])),
+    ts: Date.now(),
+  });
+  save.history();
   currentSelections = new Set();
 
   // Pick affirmation and build combined overlay
@@ -616,9 +645,64 @@ function choiceItems(c) {
 function renderSetup() {
   renderKids();
   renderChoices();
+  renderHistory();
   renderMenu();
   showAddBtn();
   updateCount();
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (!el) return;
+  if (!history.length) {
+    el.innerHTML = '<div class="no-choices">No history yet — choices will appear here.</div>';
+    return;
+  }
+  // Group by calendar date, newest first
+  const groups = new Map();
+  [...history].reverse().forEach(entry => {
+    const d = new Date(entry.ts);
+    const key = d.toLocaleDateString([], { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  });
+  el.innerHTML = '';
+  groups.forEach((entries, dateLabel) => {
+    const grp = document.createElement('div');
+    grp.className = 'h-group';
+    const hdr = document.createElement('div');
+    hdr.className = 'h-date';
+    hdr.textContent = dateLabel;
+    grp.appendChild(hdr);
+    entries.forEach(entry => {
+      const kidIdx = kids.indexOf(entry.kid);
+      const color = KCOLS[Math.max(0, kidIdx) % KCOLS.length];
+      const itemList = (entry.itemIds || []).map(id => {
+        const live = items[id];
+        const snap = entry.snapshot?.[id];
+        return live || snap || null;
+      }).filter(Boolean);
+      const val = itemList.map(i => `${i.emoji} ${esc(i.name)}`).join(', ') || '—';
+      const time = new Date(entry.ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+      const row = document.createElement('div');
+      row.className = 'h-row';
+      row.innerHTML = `
+        <div class="c-dot" style="background:${color};width:22px;height:22px;font-size:10px">${(entry.kid[0]||'?').toUpperCase()}</div>
+        <span class="h-name">${esc(entry.kid)}</span>
+        <span class="h-val">${val}</span>
+        <span class="h-time">${time}</span>`;
+      grp.appendChild(row);
+    });
+    el.appendChild(grp);
+  });
+}
+
+function clearHistory() {
+  if (!history.length) return;
+  history = [];
+  save.history();
+  renderHistory();
+  toast('History cleared');
 }
 
 function renderKids() {
