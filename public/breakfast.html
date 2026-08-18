@@ -123,7 +123,7 @@
     .gear-btn:active{background:rgba(255,255,255,.6);}
 
     /* ═══ PICK ═══════════════════════════════════════════════════════════ */
-    #v-pick{min-height:100dvh;background:linear-gradient(170deg,var(--k-top) 0%,var(--k-bot) 100%);display:flex;flex-direction:column;padding:32px 18px 48px;position:relative;}
+    #v-pick{min-height:100dvh;background:linear-gradient(170deg,var(--k-top) 0%,var(--k-bot) 100%);display:flex;flex-direction:column;padding:32px 18px 0;position:relative;}
     .pick-hd{text-align:center;margin-bottom:22px;position:relative;}
     .pick-h1{font-family:'Fraunces',Georgia,serif;font-size:clamp(1.8em,7vw,2.5em);font-weight:700;color:var(--k-text);line-height:1.1;text-wrap:balance;}
     .pick-sub{margin-top:6px;font-size:15px;color:var(--k-text2);}
@@ -134,11 +134,17 @@
     .bcard{border-radius:var(--rXL);padding:26px 12px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;user-select:none;border:2px solid rgba(255,255,255,.4);box-shadow:0 8px 24px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.07);transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s;position:relative;overflow:hidden;}
     .bcard::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,.1);pointer-events:none;}
     .bcard:active{transform:scale(.91) rotate(-1.2deg);box-shadow:0 2px 8px rgba(0,0,0,.12);}
+    .bcard.sel{border-color:rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(80,160,80,.5),0 8px 24px rgba(0,0,0,.14);}
+    .bcard.sel::before{content:'✓';position:absolute;top:8px;right:8px;z-index:2;width:24px;height:24px;background:rgba(255,255,255,.9);border-radius:50%;font-size:13px;font-weight:700;color:#1E5A30;line-height:24px;text-align:center;}
     .bcard-emoji{font-size:clamp(2.8em,11vw,3.8em);line-height:1;filter:drop-shadow(1px 3px 6px rgba(0,0,0,.14));}
     .bcard-name{font-size:clamp(.85em,3vw,1em);font-weight:600;color:rgba(0,0,0,.68);text-align:center;line-height:1.2;}
     .empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:60px 28px;color:var(--k-text2);text-align:center;}
     .empty-icon{font-size:3em;}
     .empty-state p{font-size:16px;line-height:1.6;}
+    .pick-done-bar{padding:16px 18px 36px;display:flex;justify-content:center;background:linear-gradient(to top,var(--k-bot) 60%,transparent);}
+    .pick-done-btn{padding:16px 36px;font-family:inherit;font-size:16px;font-weight:600;color:#fff;background:#3A8C50;border:none;border-radius:var(--rPill);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.22);transition:transform .15s cubic-bezier(.34,1.56,.64,1),opacity .15s;}
+    .pick-done-btn:active{transform:scale(.96);opacity:.88;}
+    .pick-done-btn:disabled{opacity:.35;cursor:default;transform:none;box-shadow:none;}
 
     /* ═══ OVERLAY ════════════════════════════════════════════════════════ */
     #overlay{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:24px;}
@@ -211,9 +217,12 @@
   <div class="pick-hd">
     <button class="back-btn" onclick="goWho()" aria-label="Back">←</button>
     <h1 class="pick-h1" id="pick-h1">Pick your breakfast!</h1>
-    <p class="pick-sub">Tap what you want this morning</p>
+    <p class="pick-sub">Tap everything you want this morning</p>
   </div>
   <div class="card-grid" id="card-grid"></div>
+  <div class="pick-done-bar">
+    <button class="pick-done-btn" id="pick-done-btn" onclick="donePicking()" disabled>Pick something first!</button>
+  </div>
 </div>
 
 <!-- ── OVERLAY ────────────────────────────────────────────────────────────── -->
@@ -369,6 +378,7 @@ function onNameInput(val, gridId) {
 
 // ── Views ──────────────────────────────────────────────────────────────────────
 let currentKid = null;
+let currentSelections = new Set();
 
 function goSetup() {
   syncKidsFromDOM();
@@ -385,9 +395,45 @@ function goWho() {
 
 function goPick(kidName) {
   currentKid = kidName;
+  // Pre-populate with any existing choices for today
+  const existing = choices[kidName];
+  if (existing?.itemIds) {
+    currentSelections = new Set(existing.itemIds);
+  } else if (existing?.itemId) {
+    currentSelections = new Set([existing.itemId]);
+  } else {
+    currentSelections = new Set();
+  }
   document.getElementById('pick-h1').textContent = `What do you want, ${kidName}?`;
   renderGrid();
+  updateDoneBtn();
   show('v-pick');
+}
+
+function donePicking() {
+  if (!currentSelections.size) return;
+  const t = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+  choices[currentKid] = { itemIds: [...currentSelections], time: t };
+  save.choices();
+  currentSelections = new Set();
+  goWho();
+}
+
+function updateDoneBtn() {
+  const btn = document.getElementById('pick-done-btn');
+  if (!btn) return;
+  const n = currentSelections.size;
+  btn.disabled = n === 0;
+  btn.textContent = n === 0 ? 'Pick something first!'
+                 : n === 1 ? 'All done! →'
+                 :           `All done — ${n} items! →`;
+}
+
+function choiceItems(c) {
+  if (!c) return [];
+  if (c.itemIds) return c.itemIds.map(id => items[id]).filter(Boolean);
+  if (c.itemId && items[c.itemId]) return [items[c.itemId]];
+  return [];
 }
 
 // ── Setup ──────────────────────────────────────────────────────────────────────
@@ -450,14 +496,15 @@ function renderChoices() {
   list.className = 'choices-list';
   valid.forEach((name,i) => {
     const c = choices[name];
-    const item = c ? items[c.itemId] : null;
+    const citems = choiceItems(c);
     const row = document.createElement('div');
     row.className = 'c-row';
-    if (c && item) {
+    if (citems.length) {
+      const val = citems.map(it=>`${it.emoji} ${esc(it.name)}`).join(', ');
       row.innerHTML = `
         <div class="c-dot" style="background:${KCOLS[i%KCOLS.length]}">${(name[0]||'?').toUpperCase()}</div>
         <span class="c-name">${esc(name)}</span>
-        <span class="c-val">${item.emoji} ${esc(item.name)}</span>
+        <span class="c-val">${val}</span>
         <span class="c-time">${c.time}</span>`;
     } else {
       row.innerHTML = `
@@ -613,19 +660,21 @@ function renderWho() {
   const doneEl = document.getElementById('all-done');
   grid.innerHTML = '';
   const valid = kids.filter(k=>k.trim());
-  const allDone = valid.length > 0 && valid.every(k => choices[k]);
+  const allDone = valid.length > 0 && valid.every(k => choiceItems(choices[k]).length > 0);
 
   valid.forEach((name, i) => {
     const c = choices[name];
-    const item = c ? items[c.itemId] : null;
+    const citems = choiceItems(c);
     const card = document.createElement('div');
-    card.className = `kcard${c?' done':''}`;
+    card.className = `kcard${citems.length?' done':''}`;
     card.style.background = KPASTEL[i%KPASTEL.length];
-    if (c && item) {
+    if (citems.length) {
+      const emojis = citems.map(it=>it.emoji).join(' ');
+      const names  = citems.map(it=>esc(it.name)).join(', ');
       card.innerHTML = `
         <div class="k-initial">${(name[0]||'?').toUpperCase()}</div>
         <div class="k-kname">${esc(name)}</div>
-        <div class="k-choice"><div class="k-choice-emoji">${item.emoji}</div><div>${esc(item.name)}</div></div>`;
+        <div class="k-choice"><div class="k-choice-emoji">${emojis}</div><div>${names}</div></div>`;
     } else {
       card.innerHTML = `
         <div class="k-initial">${(name[0]||'?').toUpperCase()}</div>
@@ -642,7 +691,7 @@ function renderWho() {
     doneEl.classList.add('hidden');
   }
 
-  const remaining = valid.filter(k=>!choices[k]);
+  const remaining = valid.filter(k=>!choiceItems(choices[k]).length);
   document.getElementById('w-sub').textContent =
     (remaining.length && remaining.length < valid.length)
       ? `${remaining.map(k=>k.split(' ')[0]).join(' & ')} — your turn!`
@@ -661,7 +710,8 @@ function renderGrid() {
   ids.forEach(id => {
     const item = items[id];
     const card = document.createElement('div');
-    card.className = 'bcard';
+    card.className = `bcard${currentSelections.has(id)?' sel':''}`;
+    card.id = `bc-${id}`;
     card.style.background = gradOf(id);
     card.innerHTML = `<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>`;
     card.addEventListener('click', () => pickItem(id));
@@ -677,13 +727,21 @@ const ctx     = canvas.getContext('2d');
 let raf=null, pts=[];
 
 function pickItem(id) {
+  // Toggle deselect without overlay
+  if (currentSelections.has(id)) {
+    currentSelections.delete(id);
+    const card = document.getElementById(`bc-${id}`);
+    if (card) card.classList.remove('sel');
+    updateDoneBtn();
+    return;
+  }
+  currentSelections.add(id);
+  const card = document.getElementById(`bc-${id}`);
+  if (card) card.classList.add('sel');
+  updateDoneBtn();
+
   const item = items[id];
   const g = gradOf(id);
-  if (currentKid) {
-    const t = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    choices[currentKid] = { itemId:id, time:t };
-    save.choices();
-  }
   document.getElementById('ov-emoji').textContent = item.emoji;
   document.getElementById('ov-name').textContent  = item.name;
   document.getElementById('ov-msg').textContent   = item.msg || 'Great choice! 🎉';
@@ -702,7 +760,8 @@ function dismissOverlay() {
   overlay.classList.remove('show');
   if(raf){cancelAnimationFrame(raf);raf=null;}
   pts=[];ctx.clearRect(0,0,canvas.width,canvas.height);
-  goWho();
+  // Stay on pick view so kids can add more items
+  show('v-pick');
 }
 
 function resizeCv(){ canvas.width=innerWidth; canvas.height=innerHeight; }
