@@ -113,6 +113,21 @@ app.post('/api/breakfast', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Redis status check
+app.get('/api/status', async (req, res) => {
+  const status = { redisConfigured: !!(REDIS_URL && REDIS_TOKEN), redisWorking: false, error: null };
+  try {
+    if (REDIS_URL && REDIS_TOKEN) {
+      await redisCmd('SET', 'ping', 'ok');
+      const result = await redisCmd('GET', 'ping');
+      status.redisWorking = result === 'ok';
+    }
+  } catch (e) {
+    status.error = e.message;
+  }
+  res.json(status);
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'Aria is online', time: new Date().toISOString() });
