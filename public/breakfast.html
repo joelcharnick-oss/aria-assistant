@@ -466,7 +466,10 @@ function applyState(data) {
 
 async function load() {
   try {
-    const resp = await fetch('/api/breakfast', { signal: AbortSignal.timeout(3000) });
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3000);
+    const resp = await fetch('/api/breakfast', { signal: ctrl.signal });
+    clearTimeout(timer);
     if (resp.ok) {
       const data = await resp.json();
       serverAvailable = true;
