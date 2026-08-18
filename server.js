@@ -128,6 +128,49 @@ app.get('/api/status', async (req, res) => {
   res.json(status);
 });
 
+// Breakfast insights via Claude
+app.post('/api/insights', async (req, res) => {
+  const { history = [], items = {}, kids = [], kidFilter = 'All', timeRange = 'month' } = req.body;
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysBack = { week: 7, month: 30, quarter: 90, all: Infinity }[timeRange] || 30;
+  const cutoff = daysBack === Infinity ? 0 : Date.now() - daysBack * dayMs;
+
+  let filtered = history.filter(e => e.ts >= cutoff);
+  if (kidFilter !== 'All') filtered = filtered.filter(e => e.kid === kidFilter);
+
+  if (!filtered.length) {
+    return res.json({ insight: "Not enough data for the selected range yet — keep logging breakfasts and check back soon! 🌟" });
+  }
+
+  const lines = filtered.map(entry => {
+    const d = new Date(entry.ts).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    const foods = (entry.itemIds || []).map(id => {
+      const info = items[id] || entry.snapshot?.[id] || { name: id };
+      const sub = entry.suboptsByItem?.[id];
+      return sub ? `${info.name} (${sub})` : info.name;
+    }).join(', ');
+    return `${entry.kid} - ${d}: ${foods}`;
+  }).join('\n');
+
+  const kidLabel = kidFilter === 'All' ? 'the kids' : kidFilter;
+  const rangeLabel = { week: 'the past week', month: 'the past month', quarter: 'the past 3 months', all: 'all recorded time' }[timeRange] || 'the past month';
+
+  const prompt = `You are a warm, practical nutritionist helping a parent understand their kids' breakfast habits. Here are the breakfast logs for ${kidLabel} over ${rangeLabel}:\n\n${lines}\n\nPlease provide:\n1. A brief nutritional balance summary (protein, carbs, fruit/veg, dairy, treats — what's well represented and what's missing)\n2. Any interesting trends or patterns you notice\n3. Two or three specific, encouraging suggestions the parent could act on\n\nTone: warm, supportive, practical. Not preachy. Use a parent-friendly voice. Keep it under 280 words. Light emoji use is fine.`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    res.json({ insight: response.content[0].text });
+  } catch (err) {
+    console.error('Insights error:', err.message);
+    res.status(500).json({ error: 'Could not generate insights right now — try again in a moment.' });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'Aria is online', time: new Date().toISOString() });

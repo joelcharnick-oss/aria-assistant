@@ -161,6 +161,20 @@
     .pick-done-btn:active{transform:scale(.96);opacity:.88;}
     .pick-done-btn:disabled{opacity:.35;cursor:default;transform:none;box-shadow:none;}
 
+    /* Insights */
+    .filter-row{display:flex;flex-direction:column;gap:12px;}
+    .filter-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--p-text3);margin-bottom:5px;}
+    .filter-chips{display:flex;flex-wrap:wrap;gap:6px;}
+    .fchip{padding:7px 14px;font-family:inherit;font-size:13px;font-weight:500;color:var(--p-text2);background:var(--p-surf);border:1.5px solid var(--p-edge);border-radius:var(--rPill);cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+    .fchip.sel{background:var(--p-amber-dim);border-color:var(--p-amber);color:var(--p-amber);}
+    .btn-analyze{width:100%;padding:14px;font-family:inherit;font-size:15px;font-weight:600;color:var(--p-bg);background:var(--p-amber);border:none;border-radius:var(--rPill);cursor:pointer;margin-top:14px;transition:opacity .15s;}
+    .btn-analyze:active{opacity:.85;}
+    .btn-analyze:disabled{opacity:.4;cursor:default;}
+    .insights-result{margin-top:14px;background:var(--p-surf);border:1px solid var(--p-edge);border-radius:var(--rMD);padding:16px;}
+    .insights-text{font-size:14px;line-height:1.75;color:var(--p-text);white-space:pre-wrap;}
+    .insights-loading{color:var(--p-text2);font-size:14px;padding:4px 0;animation:pulse 1.4s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+
     /* Sub-option sheet */
     .subopt-sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:24px 24px 0 0;padding:24px 20px max(env(safe-area-inset-bottom,0px),36px);box-shadow:0 -8px 32px rgba(0,0,0,.22);z-index:150;transform:translateY(110%);transition:transform .32s cubic-bezier(.34,1.56,.64,1);}
     .subopt-sheet.show{transform:translateY(0);}
@@ -238,6 +252,27 @@
       </span>
     </div>
     <div id="history-list"></div>
+  </div>
+
+  <div class="s-sec">
+    <div class="s-sec-head"><span class="s-sec-label">✨ Breakfast Insights</span></div>
+    <div class="filter-row">
+      <div>
+        <div class="filter-label">Kid</div>
+        <div class="filter-chips" id="filter-kid"></div>
+      </div>
+      <div>
+        <div class="filter-label">Time range</div>
+        <div class="filter-chips" id="filter-range">
+          <button class="fchip" data-val="week" onclick="setInsightRange('week')">This week</button>
+          <button class="fchip sel" data-val="month" onclick="setInsightRange('month')">This month</button>
+          <button class="fchip" data-val="quarter" onclick="setInsightRange('quarter')">3 months</button>
+          <button class="fchip" data-val="all" onclick="setInsightRange('all')">All time</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn-analyze" id="insights-btn" onclick="getInsights()">Analyze ✨</button>
+    <div class="insights-result hidden" id="insights-result"></div>
   </div>
 
   <div class="s-sec">
@@ -694,6 +729,7 @@ function renderSetup() {
   renderKids();
   renderChoices();
   renderHistory();
+  renderInsightFilters();
   renderMenu();
   showAddBtn();
   updateCount();
@@ -1211,6 +1247,51 @@ const FX={
   sizzle(){const cs=['#FF4500','#FF6348','#FF7F50','#FFA502','#FF6B6B'];for(let i=0;i<120;i++)later(i*40,()=>sp({x:rv(0,canvas.width),y:canvas.height*.55+rv(0,canvas.height*.45),vx:rv(-1.2,1.2),vy:-rv(1.2,4),size:rv(3,9),color:p1(cs),alpha:.85,wob:rv(0,TAU),wobV:rv(.1,.2),update(){this.wob+=this.wobV;this.x+=SS(this.wob)*2.5+this.vx;this.y+=this.vy;this.alpha-=.012;this.size*=1.01;if(this.alpha<=0)this.dead=true;},draw(c){c.globalAlpha=this.alpha;c.fillStyle=this.color;c.beginPath();c.arc(this.x,this.y,this.size,0,TAU);c.fill();c.globalAlpha=1;}}));},
   fruits(){const ls=['🍓','🍊','🍋','🍇','🍍','🥝','🍒','🍑','🍎','🫐','🍌','🍉'];const cx=canvas.width/2,cy=canvas.height*.45;for(let i=0;i<36;i++)later(i*80+rv(0,60),()=>{const a=rv(0,TAU),spd=rv(5,14);sp({x:cx,y:cy,vx:CC(a)*spd,vy:SS(a)*spd-5,emoji:p1(ls),size:rv(22,38),gv:.32,rot:rv(-.4,.4),rotV:rv(-.08,.08),alpha:1,update(){this.vy+=this.gv;this.x+=this.vx;this.y+=this.vy;this.vx*=.99;this.rot+=this.rotV;if(this.y>canvas.height+60)this.dead=true;},draw(c){c.save();c.globalAlpha=this.alpha;c.translate(this.x,this.y);c.rotate(this.rot);c.font=`${this.size}px serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(this.emoji,0,0);c.restore();}});});},
 };
+
+// Insights
+let insightKid = 'All';
+let insightRange = 'month';
+
+function renderInsightFilters() {
+  const el = document.getElementById('filter-kid');
+  if (!el) return;
+  const options = ['All', ...kids.filter(k=>k.trim())];
+  el.innerHTML = options.map(k =>
+    `<button class="fchip${k===insightKid?' sel':''}" onclick="setInsightKid('${esc(k)}')">${esc(k)}</button>`
+  ).join('');
+}
+
+function setInsightKid(k) {
+  insightKid = k;
+  renderInsightFilters();
+}
+
+function setInsightRange(r) {
+  insightRange = r;
+  document.querySelectorAll('#filter-range .fchip').forEach(b => b.classList.toggle('sel', b.dataset.val === r));
+}
+
+async function getInsights() {
+  if (!serverAvailable) { toast('Server not reachable — sync needed for insights'); return; }
+  if (!history.length) { toast('No breakfast history yet!'); return; }
+  const resultEl = document.getElementById('insights-result');
+  const btn = document.getElementById('insights-btn');
+  resultEl.classList.remove('hidden');
+  resultEl.innerHTML = '<div class="insights-loading">✨ Analyzing breakfast habits…</div>';
+  if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch('/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history, items, kids, kidFilter: insightKid, timeRange: insightRange }),
+    });
+    const data = await resp.json();
+    resultEl.innerHTML = `<div class="insights-text">${esc(data.insight || data.error || 'Something went wrong.')}</div>`;
+  } catch(e) {
+    resultEl.innerHTML = '<div class="insights-text" style="color:var(--p-red)">Could not connect. Try again.</div>';
+  }
+  if (btn) btn.disabled = false;
+}
 
 // Sub-option config helpers
 function renderPendingSuboptsCfg() {
