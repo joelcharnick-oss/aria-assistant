@@ -161,6 +161,28 @@
     .pick-done-btn:active{transform:scale(.96);opacity:.88;}
     .pick-done-btn:disabled{opacity:.35;cursor:default;transform:none;box-shadow:none;}
 
+    /* Sub-option sheet */
+    .subopt-sheet{position:fixed;bottom:0;left:0;right:0;background:#fff;border-radius:24px 24px 0 0;padding:24px 20px max(env(safe-area-inset-bottom,0px),36px);box-shadow:0 -8px 32px rgba(0,0,0,.22);z-index:150;transform:translateY(110%);transition:transform .32s cubic-bezier(.34,1.56,.64,1);}
+    .subopt-sheet.show{transform:translateY(0);}
+    .subopt-dimmer{position:fixed;inset:0;z-index:140;background:rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .25s;}
+    .subopt-dimmer.show{opacity:1;pointer-events:auto;}
+    .subopt-title{font-family:'Fraunces',Georgia,serif;font-size:1.35em;font-weight:700;color:var(--k-text);text-align:center;margin-bottom:18px;line-height:1.2;}
+    .subopt-opts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px;}
+    .subopt-chip{padding:12px 22px;font-family:inherit;font-size:15px;font-weight:600;color:var(--k-text);background:rgba(0,0,0,.07);border:2px solid transparent;border-radius:var(--rPill);cursor:pointer;transition:background .15s,border-color .15s;}
+    .subopt-chip:active{background:rgba(80,160,80,.15);border-color:#3A8C50;color:#1E5A30;}
+    .subopt-skip{display:block;width:100%;padding:13px;font-family:inherit;font-size:14px;color:var(--k-text2);background:transparent;border:1.5px solid rgba(0,0,0,.12);border-radius:var(--rPill);cursor:pointer;text-align:center;}
+    .bc-subopt{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:20px;font-size:10px;font-weight:700;color:#1E5A30;padding:2px 8px;white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
+    /* Sub-option config in setup */
+    .subopts-cfg{margin-top:10px;padding-top:10px;border-top:1px solid var(--p-edge);}
+    .subopts-cfg-label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--p-text3);margin-bottom:6px;}
+    .subopts-chips-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;min-height:22px;}
+    .sochip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--p-edge);border-radius:20px;font-size:12px;color:var(--p-text2);}
+    .sochip button{background:none;border:none;color:var(--p-text3);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;}
+    .subopt-add-row{display:flex;gap:6px;}
+    .subopt-add-inp{flex:1;font-size:13px;background:var(--p-bg);border:1px solid var(--p-edge);border-radius:8px;color:var(--p-text);padding:7px 10px;font-family:inherit;}
+    .subopt-add-inp:focus{outline:none;border-color:var(--p-amber);}
+    .subopt-add-btn{padding:7px 13px;font-size:13px;font-weight:600;color:var(--p-bg);background:var(--p-amber);border:none;border-radius:8px;cursor:pointer;font-family:inherit;}
+
     /* ═══ OVERLAY ════════════════════════════════════════════════════════ */
     #overlay{display:none;position:fixed;inset:0;z-index:200;align-items:center;justify-content:center;padding:24px;}
     #overlay.show{display:flex;}
@@ -205,9 +227,12 @@
   <div class="s-sec">
     <div class="s-sec-head">
       <span class="s-sec-label">Breakfast history</span>
-      <button class="s-sec-action" onclick="clearHistory()">Clear all</button>
+      <span style="display:flex;gap:10px">
+        <button class="s-sec-action" onclick="downloadHistory()">Download ↓</button>
+        <button class="s-sec-action" onclick="clearHistory()">Clear all</button>
+      </span>
     </div>
-    <div class="h-scroll" id="history-list"></div>
+    <div id="history-list"></div>
   </div>
 
   <div class="s-sec">
@@ -247,6 +272,10 @@
     <button class="pick-done-btn" id="pick-done-btn" onclick="donePicking()" disabled>Pick something first!</button>
   </div>
 </div>
+
+<!-- ── SUB-OPTION SHEET ──────────────────────────────────────────────────── -->
+<div class="subopt-dimmer" id="subopt-dimmer" onclick="closeSuboptSheet()"></div>
+<div class="subopt-sheet" id="subopt-sheet"></div>
 
 <!-- ── OVERLAY ────────────────────────────────────────────────────────────── -->
 <div id="overlay">
@@ -441,6 +470,8 @@ const KPASTEL = [
 const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1' };
 let items, active, choices, kids, history;
 let serverAvailable = false;
+let historyExpanded = false;
+let _sheetOpts = [];
 
 function applyState(data) {
   if (data.items && Object.keys(data.items).length) {
@@ -549,6 +580,8 @@ function onNameInput(val, gridId) {
 // ── Views ──────────────────────────────────────────────────────────────────────
 let currentKid = null;
 let currentSelections = new Set();
+let currentSubopts = {};
+let pendingSubopts = [];
 
 function goSetup() {
   syncKidsFromDOM();
@@ -569,10 +602,13 @@ function goPick(kidName) {
   const existing = choices[kidName];
   if (existing?.itemIds) {
     currentSelections = new Set(existing.itemIds);
+    currentSubopts = { ...(existing.suboptsByItem || {}) };
   } else if (existing?.itemId) {
     currentSelections = new Set([existing.itemId]);
+    currentSubopts = {};
   } else {
     currentSelections = new Set();
+    currentSubopts = {};
   }
   document.getElementById('pick-h1').textContent = `What do you want, ${kidName}?`;
   renderGrid();
@@ -583,20 +619,22 @@ function goPick(kidName) {
 function donePicking() {
   if (!currentSelections.size) return;
   const t = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-  choices[currentKid] = { itemIds: [...currentSelections], time: t };
+  const selectedIds = [...currentSelections];
+  choices[currentKid] = { itemIds: selectedIds, suboptsByItem: { ...currentSubopts }, time: t };
   save.choices();
 
-  const selectedIds = [...currentSelections];
   const citems = selectedIds.map(id => items[id]).filter(Boolean);
   // Append to permanent history with a snapshot so deleted items still show
   history.push({
     kid: currentKid,
     itemIds: selectedIds,
+    suboptsByItem: { ...currentSubopts },
     snapshot: Object.fromEntries(selectedIds.map(id => [id, { name: items[id]?.name, emoji: items[id]?.emoji }])),
     ts: Date.now(),
   });
   save.history();
   currentSelections = new Set();
+  currentSubopts = {};
 
   // Pick affirmation and build combined overlay
   const affirmation = AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)];
@@ -669,8 +707,11 @@ function renderHistory() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(entry);
   });
+  const allDates = [...groups.keys()];
+  const visibleDates = historyExpanded ? allDates : allDates.slice(0, 2);
   el.innerHTML = '';
-  groups.forEach((entries, dateLabel) => {
+  visibleDates.forEach(dateLabel => {
+    const entries = groups.get(dateLabel);
     const grp = document.createElement('div');
     grp.className = 'h-group';
     const hdr = document.createElement('div');
@@ -680,12 +721,12 @@ function renderHistory() {
     entries.forEach(entry => {
       const kidIdx = kids.indexOf(entry.kid);
       const color = KCOLS[Math.max(0, kidIdx) % KCOLS.length];
-      const itemList = (entry.itemIds || []).map(id => {
-        const live = items[id];
-        const snap = entry.snapshot?.[id];
-        return live || snap || null;
-      }).filter(Boolean);
-      const val = itemList.map(i => `${i.emoji} ${esc(i.name)}`).join(', ') || '—';
+      const val = (entry.itemIds || []).map(id => {
+        const info = items[id] || entry.snapshot?.[id];
+        if (!info) return null;
+        const sub = entry.suboptsByItem?.[id];
+        return `${info.emoji} ${esc(info.name)}${sub ? ` <small style="opacity:.65">(${esc(sub)})</small>` : ''}`;
+      }).filter(Boolean).join(', ') || '—';
       const time = new Date(entry.ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
       const row = document.createElement('div');
       row.className = 'h-row';
@@ -698,11 +739,20 @@ function renderHistory() {
     });
     el.appendChild(grp);
   });
+  if (allDates.length > 2) {
+    const toggle = document.createElement('button');
+    toggle.className = 's-sec-action';
+    toggle.style.cssText = 'display:block;margin-top:8px;font-size:13px;background:none;border:none;cursor:pointer;padding:2px 0;';
+    toggle.textContent = historyExpanded ? '↑ Show recent only' : `↓ See all ${allDates.length} days`;
+    toggle.onclick = () => { historyExpanded = !historyExpanded; renderHistory(); };
+    el.appendChild(toggle);
+  }
 }
 
 function clearHistory() {
   if (!history.length) return;
   history = [];
+  historyExpanded = false;
   save.history();
   renderHistory();
   toast('History cleared');
@@ -763,7 +813,11 @@ function renderChoices() {
     const row = document.createElement('div');
     row.className = 'c-row';
     if (citems.length) {
-      const val = citems.map(it=>`${it.emoji} ${esc(it.name)}`).join(', ');
+      const val = (c.itemIds || (c.itemId ? [c.itemId] : [])).map(id => {
+        const it = items[id]; if (!it) return null;
+        const sub = c.suboptsByItem?.[id];
+        return `${it.emoji} ${esc(it.name)}${sub ? ` (${esc(sub)})` : ''}`;
+      }).filter(Boolean).join(', ') || citems.map(it=>`${it.emoji} ${esc(it.name)}`).join(', ');
       row.innerHTML = `
         <div class="c-dot" style="background:${KCOLS[i%KCOLS.length]}">${(name[0]||'?').toUpperCase()}</div>
         <span class="c-name">${esc(name)}</span>
@@ -811,6 +865,7 @@ function showAddBtn() {
 
 function showAddForm() {
   pickerEmoji = '🍽';
+  pendingSubopts = [];
   document.getElementById('add-area').innerHTML = `
     <div class="item-form">
       <div class="form-top-row">
@@ -820,12 +875,22 @@ function showAddForm() {
       </div>
       <div id="emoji-hint" class="emoji-hint" style="display:none"></div>
       <div class="emoji-grid" id="add-emoji-grid"></div>
+      <div class="subopts-cfg">
+        <div class="subopts-cfg-label">Options (optional — e.g. "Scrambled", "Hard boiled")</div>
+        <div class="subopts-chips-wrap" id="add-subopts-wrap"></div>
+        <div class="subopt-add-row">
+          <input class="subopt-add-inp" id="add-subopt-inp" placeholder="Add an option..." maxlength="30"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();addPendingSubopt();}">
+          <button class="subopt-add-btn" onclick="addPendingSubopt()">+ Add</button>
+        </div>
+      </div>
       <div class="form-actions">
         <button class="btn-confirm" onclick="confirmAdd()">Add to menu</button>
         <button class="btn-cancel-sm" onclick="showAddBtn()">Cancel</button>
       </div>
     </div>`;
   buildEmojiGrid('add-emoji-grid', pickerEmoji);
+  renderPendingSuboptsCfg();
   document.getElementById('new-name').focus();
   document.getElementById('new-name').onkeydown = e => { if(e.key==='Enter') confirmAdd(); };
 }
@@ -834,7 +899,8 @@ function confirmAdd() {
   const name = document.getElementById('new-name')?.value.trim();
   if (!name) { toast('Enter a name for the item'); return; }
   const id = 'x-' + name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now();
-  items[id] = { name, emoji: pickerEmoji, custom: true, msg: 'Great choice! 🎉' };
+  items[id] = { name, emoji: pickerEmoji, custom: true, msg: 'Great choice! 🎉', ...(pendingSubopts.length ? {subopts:[...pendingSubopts]} : {}) };
+  pendingSubopts = [];
   active.add(id);
   save.items(); save.active();
   renderMenu(); showAddBtn(); updateCount();
@@ -861,6 +927,15 @@ function showEditForm(id, e) {
         oninput="onNameInput(this.value,'eg-${id}')">
     </div>
     <div class="emoji-grid" id="eg-${id}"></div>
+    <div class="subopts-cfg">
+      <div class="subopts-cfg-label">Options (optional)</div>
+      <div class="subopts-chips-wrap" id="subopts-wrap-${id}"></div>
+      <div class="subopt-add-row">
+        <input class="subopt-add-inp" id="subopt-inp-${id}" placeholder="Add an option..." maxlength="30"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addEditSubopt('${id}');}">
+        <button class="subopt-add-btn" onclick="addEditSubopt('${id}')">+ Add</button>
+      </div>
+    </div>
     <div class="form-actions" style="margin-top:2px">
       <button class="btn-confirm" onclick="confirmEdit('${id}')">Save</button>
       <button class="btn-cancel-sm" onclick="renderMenu();showAddBtn()">Cancel</button>
@@ -868,6 +943,7 @@ function showEditForm(id, e) {
 
   row.replaceWith(wrapper);
   buildEmojiGrid(`eg-${id}`, item.emoji);
+  renderEditSuboptsCfg(id);
   document.getElementById(`en-${id}`)?.focus();
 }
 
@@ -876,7 +952,9 @@ function confirmEdit(id) {
   if (!nameEl) return;
   const name = nameEl.value.trim();
   if (!name) { toast('Enter a name'); return; }
+  const subopts = items[id]?.subopts || [];
   items[id] = { ...items[id], name, emoji: pickerEmoji };
+  if (subopts.length) items[id].subopts = subopts; else delete items[id].subopts;
   save.items();
   editingId = null;
   renderMenu(); showAddBtn(); updateCount();
@@ -933,7 +1011,11 @@ function renderWho() {
     card.style.background = KPASTEL[i%KPASTEL.length];
     if (citems.length) {
       const emojis = citems.map(it=>it.emoji).join(' ');
-      const names  = citems.map(it=>esc(it.name)).join(', ');
+      const names = (c.itemIds || (c.itemId ? [c.itemId] : [])).map(id => {
+        const it = items[id]; if (!it) return null;
+        const sub = c.suboptsByItem?.[id];
+        return esc(it.name) + (sub ? ` <span style="opacity:.65;font-size:.85em">(${esc(sub)})</span>` : '');
+      }).filter(Boolean).join(', ') || citems.map(it=>esc(it.name)).join(', ');
       card.innerHTML = `
         <div class="k-initial">${(name[0]||'?').toUpperCase()}</div>
         <div class="k-kname">${esc(name)}</div>
@@ -972,11 +1054,12 @@ function renderGrid() {
   }
   ids.forEach(id => {
     const item = items[id];
+    const sub = currentSubopts[id];
     const card = document.createElement('div');
     card.className = `bcard${currentSelections.has(id)?' sel':''}`;
     card.id = `bc-${id}`;
     card.style.background = gradOf(id);
-    card.innerHTML = `<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>`;
+    card.innerHTML = `<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${sub ? `<div class="bc-subopt">${esc(sub)}</div>` : ''}`;
     card.addEventListener('click', () => pickItem(id));
     grid.appendChild(card);
   });
@@ -992,14 +1075,58 @@ let raf=null, pts=[];
 function pickItem(id) {
   if (currentSelections.has(id)) {
     currentSelections.delete(id);
+    delete currentSubopts[id];
     const card = document.getElementById(`bc-${id}`);
-    if (card) card.classList.remove('sel');
+    if (card) { card.classList.remove('sel'); const b=card.querySelector('.bc-subopt'); if(b)b.remove(); }
   } else {
+    const item = items[id];
+    if (item?.subopts?.length) {
+      showSuboptSheet(id);
+      return;
+    }
     currentSelections.add(id);
     const card = document.getElementById(`bc-${id}`);
     if (card) card.classList.add('sel');
   }
   updateDoneBtn();
+}
+
+function showSuboptSheet(id) {
+  const item = items[id];
+  _sheetOpts = item.subopts || [];
+  const sheet = document.getElementById('subopt-sheet');
+  const dimmer = document.getElementById('subopt-dimmer');
+  sheet.innerHTML = `
+    <div class="subopt-title">${item.emoji} How would you like your ${esc(item.name)}?</div>
+    <div class="subopt-opts">${_sheetOpts.map((opt,i) =>
+      `<button class="subopt-chip" onclick="selectSubopt('${id}',_sheetOpts[${i}])">${esc(opt)}</button>`
+    ).join('')}</div>
+    <button class="subopt-skip" onclick="selectSubopt('${id}',null)">Any way is fine!</button>`;
+  sheet.classList.add('show');
+  dimmer.classList.add('show');
+}
+
+function selectSubopt(id, opt) {
+  currentSelections.add(id);
+  if (opt) currentSubopts[id] = opt; else delete currentSubopts[id];
+  const card = document.getElementById(`bc-${id}`);
+  if (card) {
+    card.classList.add('sel');
+    let badge = card.querySelector('.bc-subopt');
+    if (opt) {
+      if (!badge) { badge = document.createElement('div'); badge.className='bc-subopt'; card.appendChild(badge); }
+      badge.textContent = opt;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+  closeSuboptSheet();
+  updateDoneBtn();
+}
+
+function closeSuboptSheet() {
+  document.getElementById('subopt-sheet').classList.remove('show');
+  document.getElementById('subopt-dimmer').classList.remove('show');
 }
 
 function dismissOverlay() {
@@ -1034,6 +1161,72 @@ const FX={
   sizzle(){const cs=['#FF4500','#FF6348','#FF7F50','#FFA502','#FF6B6B'];for(let i=0;i<120;i++)later(i*40,()=>sp({x:rv(0,canvas.width),y:canvas.height*.55+rv(0,canvas.height*.45),vx:rv(-1.2,1.2),vy:-rv(1.2,4),size:rv(3,9),color:p1(cs),alpha:.85,wob:rv(0,TAU),wobV:rv(.1,.2),update(){this.wob+=this.wobV;this.x+=SS(this.wob)*2.5+this.vx;this.y+=this.vy;this.alpha-=.012;this.size*=1.01;if(this.alpha<=0)this.dead=true;},draw(c){c.globalAlpha=this.alpha;c.fillStyle=this.color;c.beginPath();c.arc(this.x,this.y,this.size,0,TAU);c.fill();c.globalAlpha=1;}}));},
   fruits(){const ls=['🍓','🍊','🍋','🍇','🍍','🥝','🍒','🍑','🍎','🫐','🍌','🍉'];const cx=canvas.width/2,cy=canvas.height*.45;for(let i=0;i<36;i++)later(i*80+rv(0,60),()=>{const a=rv(0,TAU),spd=rv(5,14);sp({x:cx,y:cy,vx:CC(a)*spd,vy:SS(a)*spd-5,emoji:p1(ls),size:rv(22,38),gv:.32,rot:rv(-.4,.4),rotV:rv(-.08,.08),alpha:1,update(){this.vy+=this.gv;this.x+=this.vx;this.y+=this.vy;this.vx*=.99;this.rot+=this.rotV;if(this.y>canvas.height+60)this.dead=true;},draw(c){c.save();c.globalAlpha=this.alpha;c.translate(this.x,this.y);c.rotate(this.rot);c.font=`${this.size}px serif`;c.textAlign='center';c.textBaseline='middle';c.fillText(this.emoji,0,0);c.restore();}});});},
 };
+
+// Sub-option config helpers
+function renderPendingSuboptsCfg() {
+  const wrap = document.getElementById('add-subopts-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = pendingSubopts.length
+    ? pendingSubopts.map((o,i)=>`<span class="sochip">${esc(o)}<button onclick="removePendingSubopt(${i})">×</button></span>`).join('')
+    : '<span style="font-size:12px;color:var(--p-text3)">No options yet</span>';
+}
+function addPendingSubopt() {
+  const inp = document.getElementById('add-subopt-inp');
+  const v = inp?.value.trim();
+  if (!v || pendingSubopts.includes(v)) return;
+  pendingSubopts.push(v);
+  inp.value = '';
+  renderPendingSuboptsCfg();
+}
+function removePendingSubopt(i) {
+  pendingSubopts.splice(i, 1);
+  renderPendingSuboptsCfg();
+}
+function renderEditSuboptsCfg(id) {
+  const wrap = document.getElementById(`subopts-wrap-${id}`);
+  if (!wrap) return;
+  const subopts = items[id]?.subopts || [];
+  wrap.innerHTML = subopts.length
+    ? subopts.map((o,i)=>`<span class="sochip">${esc(o)}<button onclick="removeEditSubopt('${id}',${i})">×</button></span>`).join('')
+    : '<span style="font-size:12px;color:var(--p-text3)">No options yet</span>';
+}
+function addEditSubopt(id) {
+  const inp = document.getElementById(`subopt-inp-${id}`);
+  const v = inp?.value.trim();
+  if (!v) return;
+  if (!items[id].subopts) items[id].subopts = [];
+  if (!items[id].subopts.includes(v)) { items[id].subopts.push(v); renderEditSuboptsCfg(id); }
+  inp.value = '';
+}
+function removeEditSubopt(id, i) {
+  if (!items[id]?.subopts) return;
+  items[id].subopts.splice(i, 1);
+  renderEditSuboptsCfg(id);
+}
+
+// History CSV download
+function downloadHistory() {
+  if (!history.length) { toast('No history to download'); return; }
+  const rows = [['Date','Time','Kid','Item','Emoji','Sub-option']];
+  [...history].reverse().forEach(entry => {
+    const d = new Date(entry.ts);
+    const date = d.toLocaleDateString('en-CA');
+    const time = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    (entry.itemIds || []).forEach(id => {
+      const info = items[id] || entry.snapshot?.[id] || {name:id, emoji:''};
+      const sub = entry.suboptsByItem?.[id] || '';
+      rows.push([date, time, entry.kid||'', info.name||'', info.emoji||'', sub]);
+    });
+  });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`breakfast-log-${new Date().toLocaleDateString('en-CA')}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('Log downloaded!');
+}
 
 function star5(c,cx,cy,r,ir){let rot=-Math.PI/2;const s=Math.PI/5;c.beginPath();c.moveTo(cx+CC(rot)*r,cy+SS(rot)*r);for(let i=0;i<5;i++){rot+=s;c.lineTo(cx+CC(rot)*ir,cy+SS(rot)*ir);rot+=s;c.lineTo(cx+CC(rot)*r,cy+SS(rot)*r);}c.closePath();}
 
