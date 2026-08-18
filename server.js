@@ -1,10 +1,13 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
 const twilio = require('twilio');
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -63,6 +66,51 @@ app.post('/whatsapp', async (req, res) => {
     res.type('text/xml');
     res.send(twiml.toString());
   }
+});
+
+// Breakfast app data sync
+const BREAKFAST_FILE = path.join(__dirname, 'breakfast-data.json');
+const REDIS_URL   = process.env.UPSTASH_REDIS_REST_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+async function redisCmd(...args) {
+  const res = await fetch(REDIS_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${REDIS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  });
+  const { result } = await res.json();
+  return result;
+}
+
+async function redisGet() {
+  const result = await redisCmd('GET', 'breakfast-data');
+  return result ? JSON.parse(result) : null;
+}
+
+async function redisSet(data) {
+  await redisCmd('SET', 'breakfast-data', JSON.stringify(data));
+}
+
+app.get('/api/breakfast', async (req, res) => {
+  try {
+    if (REDIS_URL && REDIS_TOKEN) {
+      res.json(await redisGet() || {});
+    } else {
+      res.json(fs.existsSync(BREAKFAST_FILE) ? JSON.parse(fs.readFileSync(BREAKFAST_FILE, 'utf8')) : {});
+    }
+  } catch (e) { res.json({}); }
+});
+
+app.post('/api/breakfast', async (req, res) => {
+  try {
+    if (REDIS_URL && REDIS_TOKEN) {
+      await redisSet(req.body);
+    } else {
+      fs.writeFileSync(BREAKFAST_FILE, JSON.stringify(req.body, null, 2));
+    }
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Health check
