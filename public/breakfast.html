@@ -423,19 +423,58 @@ const KPASTEL = [
 // ── Storage ────────────────────────────────────────────────────────────────────
 const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4' };
 let items, active, choices, kids;
+let serverAvailable = false;
 
-function load() {
-  try { items   = JSON.parse(localStorage.getItem(SK.items))   || clone(DEFAULTS); } catch(e){ items = clone(DEFAULTS); }
-  try { const a = JSON.parse(localStorage.getItem(SK.active));  active  = new Set(a || Object.keys(items)); } catch(e){ active  = new Set(Object.keys(items)); }
-  try { choices = JSON.parse(localStorage.getItem(SK.choices)) || {}; } catch(e){ choices = {}; }
-  try { kids    = JSON.parse(localStorage.getItem(SK.kids))    || ['Jonah','Lily']; } catch(e){ kids = ['Jonah','Lily']; }
+function applyState(data) {
+  if (data.items && Object.keys(data.items).length) {
+    items = data.items;
+  } else {
+    try { items = JSON.parse(localStorage.getItem(SK.items)) || clone(DEFAULTS); } catch(e){ items = clone(DEFAULTS); }
+  }
+  if (data.active) {
+    active = new Set(data.active);
+  } else {
+    try { const a = JSON.parse(localStorage.getItem(SK.active)); active = new Set(a || Object.keys(items)); } catch(e){ active = new Set(Object.keys(items)); }
+  }
+  choices = data.choices || (() => { try { return JSON.parse(localStorage.getItem(SK.choices)) || {}; } catch(e){ return {}; } })();
+  kids    = data.kids    || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))    || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
+  // Mirror to localStorage for offline fallback
+  localStorage.setItem(SK.items,   JSON.stringify(items));
+  localStorage.setItem(SK.active,  JSON.stringify([...active]));
+  localStorage.setItem(SK.choices, JSON.stringify(choices));
+  localStorage.setItem(SK.kids,    JSON.stringify(kids));
 }
+
+async function load() {
+  try {
+    const resp = await fetch('/api/breakfast', { signal: AbortSignal.timeout(3000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      serverAvailable = true;
+      applyState(data);
+      return;
+    }
+  } catch(e) { /* server not reachable — use localStorage */ }
+  serverAvailable = false;
+  applyState({});
+}
+
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
+
+function pushToServer() {
+  if (!serverAvailable) return;
+  fetch('/api/breakfast', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, active: [...active], choices, kids }),
+  }).catch(() => {});
+}
+
 const save = {
-  items()  { localStorage.setItem(SK.items,   JSON.stringify(items)); },
-  active() { localStorage.setItem(SK.active,  JSON.stringify([...active])); },
-  choices(){ localStorage.setItem(SK.choices, JSON.stringify(choices)); },
-  kids()   { localStorage.setItem(SK.kids,    JSON.stringify(kids)); },
+  items()  { localStorage.setItem(SK.items,   JSON.stringify(items));        pushToServer(); },
+  active() { localStorage.setItem(SK.active,  JSON.stringify([...active]));  pushToServer(); },
+  choices(){ localStorage.setItem(SK.choices, JSON.stringify(choices));       pushToServer(); },
+  kids()   { localStorage.setItem(SK.kids,    JSON.stringify(kids));          pushToServer(); },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -923,10 +962,25 @@ function toast(msg){
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
-load();
-const firstTime = !localStorage.getItem(SK.kids) && !localStorage.getItem(SK.items);
-if (firstTime) { renderSetup(); show('v-setup'); }
-else           { renderWho();   show('v-who');   }
+(async () => {
+  await load();
+  const firstTime = !serverAvailable && !localStorage.getItem(SK.kids) && !localStorage.getItem(SK.items);
+  if (firstTime) { renderSetup(); show('v-setup'); }
+  else           { renderWho();   show('v-who');   }
+})();
+
+// Re-sync when the app is brought back into focus on any device
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden) return;
+  const before = JSON.stringify({ items, active: [...active], choices, kids });
+  await load();
+  const after = JSON.stringify({ items, active: [...active], choices, kids });
+  if (before === after) return;
+  // State changed — re-render current view
+  const cur = ['v-setup','v-who','v-pick'].find(v => !document.getElementById(v).classList.contains('hidden'));
+  if (cur === 'v-setup') renderSetup();
+  else if (cur === 'v-who') renderWho();
+});
 </script>
 </body>
 </html>

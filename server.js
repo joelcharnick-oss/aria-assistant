@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
 const twilio = require('twilio');
 
@@ -64,6 +65,30 @@ app.post('/whatsapp', async (req, res) => {
     twiml.message("Sorry, I'm having a moment. Try again in a sec! — Aria");
     res.type('text/xml');
     res.send(twiml.toString());
+  }
+});
+
+// Breakfast app data sync
+const BREAKFAST_FILE = path.join(__dirname, 'breakfast-data.json');
+
+app.get('/api/breakfast', (req, res) => {
+  try {
+    if (fs.existsSync(BREAKFAST_FILE)) {
+      res.json(JSON.parse(fs.readFileSync(BREAKFAST_FILE, 'utf8')));
+    } else {
+      res.json({});
+    }
+  } catch (e) {
+    res.json({});
+  }
+});
+
+app.post('/api/breakfast', (req, res) => {
+  try {
+    fs.writeFileSync(BREAKFAST_FILE, JSON.stringify(req.body, null, 2));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
