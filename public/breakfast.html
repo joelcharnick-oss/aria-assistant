@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>🌅 Breakfast Picker!</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Breakfast">
+  <meta name="theme-color" content="#E8B44A">
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
@@ -244,36 +250,138 @@
 <script>
 // ── Emoji data ─────────────────────────────────────────────────────────────────
 const FOOD_EMOJIS = [
-  '🥞','🍳','🥣','🍞','🧇','🥤','🥓','🍓','🥑','🥐',
-  '🧁','🥯','🍌','🍊','🥝','🍎','🥛','🫐','🍩','🌯',
-  '🥚','🧀','🥔','☕','🍫','🥜','🍇','🍑','🍉','🍋',
-  '🫙','🍯','🥨','🧃','🍒','🥭','🍐','🌽','🥪','🍕',
-  '🌮','🧆','🥗','🍜','🍚','🥩','🥦','🍠','🥕','🫛',
+  // Classic breakfast
+  '🥞','🍳','🥚','🧇','🥓','🍞','🥐','🥯','🥣','🧁',
+  // Drinks
+  '☕','🍵','🧋','🥤','🥛','🧃','🍊','🫖',
+  // Fruits
+  '🍓','🫐','🍌','🍎','🥝','🍇','🍑','🍉','🍋','🍒','🥭','🍐','🍍',
+  // Savory / protein
+  '🥩','🌭','🧀','🥑','🐟','🥔','🌽','🥗','🥪','🍅',
+  // Sweets & spreads
+  '🍩','🍫','🍯','🫙','🥜','🍪','🌰','🧈',
+  // International & other
+  '🌮','🌯','🥨','🧆','🍜','🍚','🥦','🍠','🥕','🫔','🥧','🥟','🫕','🥥',
 ];
 
 const EMOJI_HINTS = {
-  avocado:'🥑', avo:'🥑', bagel:'🥯', banana:'🍌',
-  berry:'🫐', berries:'🫐', blueberry:'🫐', blueberries:'🫐',
-  bread:'🍞', bun:'🥐', burrito:'🌯', wrap:'🌯',
-  butter:'🧈', cereal:'🥣', granola:'🥣', muesli:'🥣', porridge:'🥣', oat:'🥣',
-  cheese:'🧀', chocolate:'🍫', choc:'🍫',
-  coffee:'☕', cocoa:'☕', hot:'☕',
-  corn:'🌽', crepe:'🥞', croissant:'🥐', danish:'🥐',
-  donut:'🍩', doughnut:'🍩', egg:'🍳', eggs:'🍳', scramble:'🍳', omelet:'🍳',
-  french:'🍞', fruit:'🍓', grape:'🍇', grapes:'🍇',
-  ham:'🥩', hash:'🥔', honey:'🍯', jam:'🫙', jelly:'🫙',
-  juice:'🧃', kiwi:'🥝', lemon:'🍋', mango:'🥭', melon:'🍈',
-  milk:'🥛', muffin:'🧁', noodle:'🍜', noodles:'🍜',
-  orange:'🍊', pancake:'🥞', pancakes:'🥞',
-  peach:'🍑', pear:'🍐', pineapple:'🍍', pretzel:'🥨',
-  protein:'🥩', sausage:'🌭', smoothie:'🥤', shake:'🥤',
-  strawberry:'🍓', strawberries:'🍓', toast:'🍞',
-  tomato:'🍅', waffle:'🧇', waffles:'🧇', watermelon:'🍉',
-  yogurt:'🫙', yoghurt:'🫙', yoghourt:'🫙',
-  bacon:'🥓', apple:'🍎', nut:'🌰', nuts:'🌰',
-  peanut:'🥜', almond:'🌰', raisin:'🍇', sandwich:'🥪',
-  taco:'🌮', bowl:'🥣', bar:'🍫', biscuit:'🍪', cookie:'🍪',
+  // Eggs
+  egg:'🍳', eggs:'🍳', scramble:'🍳', scrambled:'🍳', omelet:'🍳', omelette:'🍳',
+  benedict:'🍳', florentine:'🍳', royale:'🐟', hollandaise:'🍳', poach:'🍳',
+  poached:'🍳', fried:'🍳', sunny:'🍳', overeasy:'🍳', shakshuka:'🍳',
+  frittata:'🍳', huevos:'🍳', migas:'🍳', strata:'🥧', quiche:'🥧',
+  // Pancakes / waffles / crepes
+  pancake:'🥞', pancakes:'🥞', crepe:'🥞', crepes:'🥞', hotcake:'🥞',
+  waffle:'🧇', waffles:'🧇', belgian:'🧇', liege:'🧇',
+  // Toast & bread
+  toast:'🍞', bread:'🍞', french:'🍞', brioche:'🍞', challah:'🍞',
+  sourdough:'🍞', rye:'🍞', pumpernickel:'🍞', white:'🍞',
+  whole:'🍞', multigrain:'🍞', baguette:'🍞', ciabatta:'🍞',
+  // Pastries
+  croissant:'🥐', danish:'🥐', pain:'🥐', palmier:'🥐', pastry:'🥐',
+  bagel:'🥯', english:'🥯', pita:'🥯', naan:'🥯', flatbread:'🥯',
+  muffin:'🧁', scone:'🧁', roll:'🧁', cinnamon:'🧁', bun:'🧁',
+  coffee_cake:'🧁', streusel:'🧁', biscuit:'🧁',
+  donut:'🍩', doughnut:'🍩', churro:'🍩',
+  // Bacon & meat
+  bacon:'🥓', canadian:'🥩', ham:'🥩', prosciutto:'🥩', salami:'🥩',
+  sausage:'🌭', link:'🌭', patty:'🌭', chorizo:'🌭', kielbasa:'🌭',
+  turkey:'🥩', corned:'🥩', steak:'🥩', smoked:'🐟',
+  // Fish / seafood
+  salmon:'🐟', lox:'🐟', gravlax:'🐟', nova:'🐟', fish:'🐟',
+  herring:'🐟', trout:'🐟', tuna:'🐟', anchov:'🐟',
+  // Cereal / oats / porridge
+  cereal:'🥣', granola:'🥣', muesli:'🥣', oat:'🥣', oats:'🥣',
+  porridge:'🥣', congee:'🍚', jook:'🍚', overnight:'🥣',
+  chia:'🫙', hemp:'🥣', flax:'🥣',
+  // Yogurt / dairy
+  yogurt:'🫙', yoghurt:'🫙', kefir:'🫙', cottage:'🧀', cheese:'🧀',
+  cream:'🧀', ricotta:'🧀', milk:'🥛', butter:'🧈',
+  // Fruit
+  fruit:'🍓', strawberry:'🍓', strawberries:'🍓', berry:'🫐',
+  berries:'🫐', blueberry:'🫐', blueberries:'🫐', raspberry:'🍓',
+  banana:'🍌', apple:'🍎', kiwi:'🥝', grape:'🍇', grapes:'🍇',
+  peach:'🍑', pear:'🍐', pineapple:'🍍', mango:'🥭', papaya:'🥭',
+  watermelon:'🍉', melon:'🍉', cherry:'🍒', lemon:'🍋', lime:'🍋',
+  orange:'🍊', citrus:'🍊', grapefruit:'🍊', guava:'🍐',
+  passion:'🍊', coconut:'🥥', avocado:'🥑', avo:'🥑', tomato:'🍅',
+  pitaya:'🍓', acai:'🫐',
+  // Potatoes / hash
+  hash:'🥔', potato:'🥔', potatoes:'🥔', home:'🥔', fries:'🥔',
+  sweet:'🍠', yam:'🍠',
+  // Drinks
+  coffee:'☕', espresso:'☕', cappuccino:'☕', latte:'☕',
+  macchiato:'☕', americano:'☕', cold:'🧋', nitro:'🧋',
+  tea:'🍵', matcha:'🍵', chai:'🍵', herbal:'🍵', green:'🍵',
+  black:'🍵', bubble:'🧋', boba:'🧋', kombucha:'🧃',
+  juice:'🧃', smoothie:'🥤', shake:'🥤', protein:'🥤',
+  collagen:'🥤', cocoa:'☕', hot_chocolate:'☕', chocolate:'🍫',
+  // Honey / jam / spreads
+  honey:'🍯', jam:'🫙', jelly:'🫙', peanut:'🥜', almond:'🌰',
+  nut:'🌰', nuts:'🌰', cashew:'🥜', sunflower:'🥜', tahini:'🫙',
+  // International
+  taco:'🌮', breakfast_taco:'🌮', burrito:'🌯', wrap:'🌯',
+  sandwich:'🥪', bagel_sandwich:'🥪', dim:'🥟', dumpling:'🥟',
+  har:'🥟', siu:'🥟', falafel:'🧆', corn:'🌽', grits:'🌽',
+  bowl:'🥣', acai_bowl:'🫐', granola_bowl:'🥣', smoothie_bowl:'🥤',
+  // Other
+  pretzel:'🥨', raisin:'🍇', bar:'🍫', cookie:'🍪', biscotti:'🍪',
+  wafer:'🍪', cracker:'🥨', rice:'🍚', noodle:'🍜', noodles:'🍜',
+  soup:'🍜', broth:'🍜', tofu:'🥟', tempeh:'🥩',
 };
+
+const AFFIRMATIONS = [
+  "This sounds like a wonderful meal to start your day! 🌟",
+  "Breakfast champions choose well — and you are a champion! 👑",
+  "Scientists have confirmed: this is the perfect breakfast. (Citation needed.) 🔬",
+  "Your tummy is about to do a happy dance! 💃",
+  "Five stars! Would eat again immediately! ⭐⭐⭐⭐⭐",
+  "Alert: maximum breakfast deliciousness detected! 🚨",
+  "The breakfast gods smile upon your choice today! ✨",
+  "Your future self just texted to say THANK YOU! 📲",
+  "This is what mornings were invented for! 🌅",
+  "Somewhere, a chef is proud of you right now! 👨‍🍳",
+  "This breakfast is giving main character energy! 🌟",
+  "Bold move. Delicious move. Excellent move! 💪",
+  "Your breakfast is officially better than whatever anyone else is having! 😎",
+  "The morning is officially saved — you're welcome, everyone! 🦸",
+  "A breakfast so good it should be framed on the wall! 🖼️",
+  "This deserves a standing ovation! *crowd goes wild* 🎉",
+  "If breakfast were a sport, you'd be winning right now! 🏅",
+  "Your taste buds are about to throw a party! 🎊",
+  "Today is already a great day and you haven't even eaten yet! 🌈",
+  "Fueling up for an absolutely incredible day ahead! 🚀",
+  "This is the breakfast that dreams are made of! 💭",
+  "Even the sun got up early just to celebrate this breakfast! ☀️",
+  "10/10, no notes, this is a perfect breakfast! 💯",
+  "You have chosen wisely, young breakfast warrior! ⚔️",
+  "This breakfast is going straight to the hall of fame! 🏛️",
+  "Today's forecast: sunny with a 100% chance of delicious! ⛅",
+  "Your stomach just sent a thank-you card! 💌",
+  "Breaking news: best breakfast ever selected! More at 11! 📺",
+  "This combination should be in a museum — the Museum of Yum! 🎨",
+  "Breakfast: achieved. Morning: conquered. Day: ready! 💥",
+  "Your energy levels are about to go through the roof! ⚡",
+  "A certified banger breakfast! No cap! 🧢",
+  "Future you just called — they said this breakfast was AMAZING! 📱",
+  "The birds are singing louder because of your breakfast! 🐦",
+  "Extraordinary choice for an extraordinary person! 🌠",
+  "Breakfast hall of fame — first ballot inductee, right here! 🎖️",
+  "If breakfast were an Olympic sport, you'd be on the podium! 🥇",
+  "This breakfast has the full endorsement of the Breakfast Committee! ✅",
+  "Plot twist: this breakfast is the best part of the whole day! 🎬",
+  "Your tummy is already writing a five-star review! ⭐",
+  "This breakfast would make a grandmother cry happy tears! 👵❤️",
+  "Spectacular. Stunning. Sensational. That's this breakfast! ✨",
+  "You didn't just pick breakfast — you picked a whole vibe! 😌",
+  "Congratulations! You've unlocked: Perfect Morning Achievement! 🏆",
+  "The kitchen just called. It says it's honoured to be part of this! 🍽️",
+  "A+ breakfast! Your teacher would be very impressed! 🍎",
+  "Officially the most exciting thing to happen this morning! 🎆",
+  "Your belly is about to have the absolute time of its life! 🎠",
+  "A masterclass in breakfast selection! Simply incredible! 🎓",
+  "Nutritionists are applauding. Somewhere. Probably loudly. 👏",
+];
 
 function suggestEmoji(name) {
   const low = name.toLowerCase();
@@ -415,8 +523,37 @@ function donePicking() {
   const t = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
   choices[currentKid] = { itemIds: [...currentSelections], time: t };
   save.choices();
+
+  const citems = [...currentSelections].map(id => items[id]).filter(Boolean);
   currentSelections = new Set();
-  goWho();
+
+  // Pick affirmation and build combined overlay
+  const affirmation = AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)];
+  const emojis = citems.map(i => i.emoji).join(' ');
+  const names  = citems.map(i => i.name).join(', ');
+
+  const emojiEl = document.getElementById('ov-emoji');
+  emojiEl.textContent = emojis;
+  emojiEl.style.fontSize = citems.length >= 4 ? '3em' : citems.length >= 3 ? '3.5em' : citems.length >= 2 ? '4em' : '5.5em';
+
+  document.getElementById('ov-name').textContent = names;
+  document.getElementById('ov-msg').textContent  = affirmation;
+  document.getElementById('ov-kid').textContent  = currentKid || '';
+
+  // Gradient and FX from the first item (or random)
+  const firstId = choices[currentKid]?.itemIds?.[0];
+  const g = firstId ? gradOf(firstId) : 'linear-gradient(145deg,#FFCD7B,#D97B0A)';
+  ovBg.style.background = g;
+  document.getElementById('ov-btn').style.background = btnOf(g);
+
+  overlay.classList.add('show');
+  ['ov-card','ov-emoji'].forEach(eid => {
+    const el = document.getElementById(eid);
+    el.style.animation = 'none'; el.offsetHeight; el.style.animation = '';
+  });
+  resizeCv();
+  // Mixed particle FX: use fruits for multi-item, else first item's fx
+  launchFx(citems.length > 1 ? 'fruits' : (firstId ? fxOf(firstId) : 'stars'));
 }
 
 function updateDoneBtn() {
@@ -727,41 +864,23 @@ const ctx     = canvas.getContext('2d');
 let raf=null, pts=[];
 
 function pickItem(id) {
-  // Toggle deselect without overlay
   if (currentSelections.has(id)) {
     currentSelections.delete(id);
     const card = document.getElementById(`bc-${id}`);
     if (card) card.classList.remove('sel');
-    updateDoneBtn();
-    return;
+  } else {
+    currentSelections.add(id);
+    const card = document.getElementById(`bc-${id}`);
+    if (card) card.classList.add('sel');
   }
-  currentSelections.add(id);
-  const card = document.getElementById(`bc-${id}`);
-  if (card) card.classList.add('sel');
   updateDoneBtn();
-
-  const item = items[id];
-  const g = gradOf(id);
-  document.getElementById('ov-emoji').textContent = item.emoji;
-  document.getElementById('ov-name').textContent  = item.name;
-  document.getElementById('ov-msg').textContent   = item.msg || 'Great choice! 🎉';
-  document.getElementById('ov-kid').textContent   = currentKid || '';
-  ovBg.style.background = g;
-  document.getElementById('ov-btn').style.background = btnOf(g);
-  overlay.classList.add('show');
-  ['ov-card','ov-emoji'].forEach(eid=>{
-    const el=document.getElementById(eid);
-    el.style.animation='none';el.offsetHeight;el.style.animation='';
-  });
-  resizeCv(); launchFx(fxOf(id));
 }
 
 function dismissOverlay() {
   overlay.classList.remove('show');
   if(raf){cancelAnimationFrame(raf);raf=null;}
   pts=[];ctx.clearRect(0,0,canvas.width,canvas.height);
-  // Stay on pick view so kids can add more items
-  show('v-pick');
+  goWho();
 }
 
 function resizeCv(){ canvas.width=innerWidth; canvas.height=innerHeight; }
