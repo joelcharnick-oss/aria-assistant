@@ -184,7 +184,12 @@
     .subopt-opts{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px;}
     .subopt-chip{padding:12px 22px;font-family:inherit;font-size:15px;font-weight:600;color:var(--k-text);background:rgba(0,0,0,.07);border:2px solid transparent;border-radius:var(--rPill);cursor:pointer;transition:background .15s,border-color .15s;}
     .subopt-chip:active{background:rgba(80,160,80,.15);border-color:#3A8C50;color:#1E5A30;}
+    .subopt-chip.selected{background:rgba(80,160,80,.18);border-color:#3A8C50;color:#1E5A30;}
     .subopt-skip{display:block;width:100%;padding:13px;font-family:inherit;font-size:14px;color:var(--k-text2);background:transparent;border:1.5px solid rgba(0,0,0,.12);border-radius:var(--rPill);cursor:pointer;text-align:center;}
+    .subopt-done{display:block;width:100%;padding:13px;font-family:inherit;font-size:15px;font-weight:700;color:#fff;background:#3A8C50;border:none;border-radius:var(--rPill);cursor:pointer;text-align:center;margin-top:10px;}
+    .subopt-actions{display:flex;gap:10px;margin-top:4px;}
+    .subopt-actions .subopt-skip{width:auto;flex:1;}
+    .subopt-actions .subopt-done{width:auto;flex:2;margin-top:0;}
     .bc-subopt{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:20px;font-size:10px;font-weight:700;color:#1E5A30;padding:2px 8px;white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
     /* Sub-option chips in menu list */
     .t-subopts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -511,6 +516,8 @@ let items, active, choices, kids, history, activeSubopts;
 let serverAvailable = false;
 let historyExpanded = false;
 let _sheetOpts = [];
+let _sheetItemId = null;
+let _sheetSelected = new Set();
 
 function applyState(data) {
   if (data.items && Object.keys(data.items).length) {
@@ -662,7 +669,8 @@ function donePicking() {
   if (!currentSelections.size) return;
   const t = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
   const selectedIds = [...currentSelections];
-  choices[currentKid] = { itemIds: selectedIds, suboptsByItem: { ...currentSubopts }, time: t };
+  const suboptsForSave = Object.fromEntries(Object.entries(currentSubopts).map(([k,v])=>[k,Array.isArray(v)?v.join(', '):v]));
+  choices[currentKid] = { itemIds: selectedIds, suboptsByItem: suboptsForSave, time: t };
   save.choices();
 
   const citems = selectedIds.map(id => items[id]).filter(Boolean);
@@ -670,7 +678,7 @@ function donePicking() {
   history.push({
     kid: currentKid,
     itemIds: selectedIds,
-    suboptsByItem: { ...currentSubopts },
+    suboptsByItem: suboptsForSave,
     snapshot: Object.fromEntries(selectedIds.map(id => [id, { name: items[id]?.name, emoji: items[id]?.emoji }])),
     ts: Date.now(),
   });
@@ -1180,28 +1188,48 @@ function showSuboptSheet(id) {
     updateDoneBtn();
     return;
   }
-  const sheet = document.getElementById('subopt-sheet');
-  const dimmer = document.getElementById('subopt-dimmer');
-  sheet.innerHTML = `
-    <div class="subopt-title">${item.emoji} How would you like your ${esc(item.name)}?</div>
-    <div class="subopt-opts">${_sheetOpts.map((opt,i) =>
-      `<button class="subopt-chip" onclick="selectSubopt('${id}',_sheetOpts[${i}])">${esc(opt)}</button>`
-    ).join('')}</div>
-    <button class="subopt-skip" onclick="selectSubopt('${id}',null)">Any way is fine!</button>`;
-  sheet.classList.add('show');
-  dimmer.classList.add('show');
+  _sheetItemId = id;
+  const existing = currentSubopts[id];
+  _sheetSelected = new Set(existing ? (Array.isArray(existing) ? existing : existing.split(', ').filter(Boolean)) : []);
+  renderSuboptSheet();
+  document.getElementById('subopt-sheet').classList.add('show');
+  document.getElementById('subopt-dimmer').classList.add('show');
 }
 
-function selectSubopt(id, opt) {
+function renderSuboptSheet() {
+  const item = items[_sheetItemId];
+  document.getElementById('subopt-sheet').innerHTML = `
+    <div class="subopt-title">${item.emoji} How would you like your ${esc(item.name)}?<br><span style="font-size:.65em;font-weight:400;opacity:.6">Pick as many as you want</span></div>
+    <div class="subopt-opts">${_sheetOpts.map(opt =>
+      `<button class="subopt-chip${_sheetSelected.has(opt)?' selected':''}" onclick="toggleSheetOpt(${JSON.stringify(opt)})">${esc(opt)}</button>`
+    ).join('')}</div>
+    <div class="subopt-actions">
+      <button class="subopt-skip" onclick="confirmSheetOpts(true)">Any way!</button>
+      <button class="subopt-done" onclick="confirmSheetOpts(false)">Done ✓</button>
+    </div>`;
+}
+
+function toggleSheetOpt(opt) {
+  if (_sheetSelected.has(opt)) _sheetSelected.delete(opt); else _sheetSelected.add(opt);
+  renderSuboptSheet();
+}
+
+function confirmSheetOpts(skip) {
+  const id = _sheetItemId;
   currentSelections.add(id);
-  if (opt) currentSubopts[id] = opt; else delete currentSubopts[id];
+  if (!skip && _sheetSelected.size > 0) {
+    currentSubopts[id] = [..._sheetSelected];
+  } else {
+    delete currentSubopts[id];
+  }
   const card = document.getElementById(`bc-${id}`);
   if (card) {
     card.classList.add('sel');
     let badge = card.querySelector('.bc-subopt');
-    if (opt) {
+    const label = Array.isArray(currentSubopts[id]) ? currentSubopts[id].join(', ') : currentSubopts[id];
+    if (label) {
       if (!badge) { badge = document.createElement('div'); badge.className='bc-subopt'; card.appendChild(badge); }
-      badge.textContent = opt;
+      badge.textContent = label;
     } else if (badge) {
       badge.remove();
     }
