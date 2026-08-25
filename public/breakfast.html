@@ -1200,8 +1200,8 @@ function renderSuboptSheet() {
   const item = items[_sheetItemId];
   document.getElementById('subopt-sheet').innerHTML = `
     <div class="subopt-title">${item.emoji} How would you like your ${esc(item.name)}?<br><span style="font-size:.65em;font-weight:400;opacity:.6">Pick as many as you want</span></div>
-    <div class="subopt-opts">${_sheetOpts.map(opt =>
-      `<button class="subopt-chip${_sheetSelected.has(opt)?' selected':''}" onclick="toggleSheetOpt(${JSON.stringify(opt)})">${esc(opt)}</button>`
+    <div class="subopt-opts">${_sheetOpts.map((opt,i) =>
+      `<button class="subopt-chip${_sheetSelected.has(opt)?' selected':''}" onclick="toggleSheetOpt(${i})">${esc(opt)}</button>`
     ).join('')}</div>
     <div class="subopt-actions">
       <button class="subopt-skip" onclick="confirmSheetOpts(true)">Any way!</button>
@@ -1209,7 +1209,8 @@ function renderSuboptSheet() {
     </div>`;
 }
 
-function toggleSheetOpt(opt) {
+function toggleSheetOpt(i) {
+  const opt = _sheetOpts[i];
   if (_sheetSelected.has(opt)) _sheetSelected.delete(opt); else _sheetSelected.add(opt);
   renderSuboptSheet();
 }
