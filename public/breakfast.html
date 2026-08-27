@@ -202,8 +202,10 @@
     .t-star-btn{background:transparent;border:none;font-size:16px;cursor:pointer;padding:0 4px;opacity:.25;transition:opacity .15s;flex-shrink:0;}
     .t-star-btn.on{opacity:1;}
     /* Featured item glow on kid grid */
-    @keyframes featGlow{0%,100%{box-shadow:0 8px 24px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.07),0 0 0 0 rgba(255,200,0,0);}50%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.07),0 0 22px 8px rgba(255,200,0,.5);}}
+    @keyframes featGlow{0%,100%{box-shadow:0 8px 24px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.07),0 0 0 0 rgba(255,200,0,0);}50%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.07),0 0 26px 10px rgba(255,200,0,.55);}}
+    @keyframes sparkleAnim{0%{opacity:0;transform:scale(0) rotate(0deg);}45%{opacity:1;transform:scale(1.3) rotate(180deg);}100%{opacity:0;transform:scale(0) rotate(360deg);}}
     .bcard.featured{animation:featGlow 2s ease-in-out infinite;}
+    .bcard-sparkle{position:absolute;font-size:13px;animation:sparkleAnim 1.8s ease-in-out infinite;pointer-events:none;z-index:3;line-height:1;}
     .featured-badge{position:absolute;top:7px;right:7px;font-size:9px;font-weight:800;background:rgba(255,210,0,.95);color:#5a3a00;padding:2px 7px;border-radius:10px;letter-spacing:.02em;z-index:2;}
     /* Emoji search */
     .emoji-search-inp{width:100%;box-sizing:border-box;padding:5px 10px;font-size:13px;border:1.5px solid rgba(0,0,0,.15);border-radius:8px;margin-bottom:6px;font-family:inherit;outline:none;}
@@ -1250,7 +1252,15 @@ function renderGrid() {
     card.className = `bcard${currentSelections.has(id)?' sel':''}${isFeatured?' featured':''}`;
     card.id = `bc-${id}`;
     card.style.background = gradOf(id);
-    card.innerHTML = `${isFeatured?'<div class="featured-badge">⭐ Special</div>':''}<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${subLabel?`<div class="bc-subopt">${esc(subLabel)}</div>`:''}`;
+    const sparkles = isFeatured ? [
+      'top:5px;left:5px;animation-delay:0s',
+      'top:5px;right:36px;animation-delay:.5s',
+      'bottom:6px;left:6px;animation-delay:.9s',
+      'bottom:6px;right:6px;animation-delay:.3s',
+      'top:42%;left:2px;animation-delay:.7s',
+      'top:42%;right:2px;animation-delay:1.2s',
+    ].map(s=>`<span class="bcard-sparkle" style="${s}">✨</span>`).join('') : '';
+    card.innerHTML = `${sparkles}${isFeatured?'<div class="featured-badge">⭐ Special</div>':''}<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${subLabel?`<div class="bc-subopt">${esc(subLabel)}</div>`:''}`;
     card.addEventListener('click', () => pickItem(id));
     grid.appendChild(card);
   });
