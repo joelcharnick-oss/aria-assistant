@@ -209,6 +209,11 @@
     .featured-badge{position:absolute;top:7px;right:7px;font-size:9px;font-weight:800;background:rgba(255,210,0,.95);color:#5a3a00;padding:2px 7px;border-radius:10px;letter-spacing:.02em;z-index:2;}
     /* Emoji search */
     .emoji-search-inp{width:100%;box-sizing:border-box;padding:5px 10px;font-size:13px;border:1.5px solid rgba(0,0,0,.15);border-radius:8px;margin-bottom:6px;font-family:inherit;outline:none;}
+    /* Emoji category tabs */
+    .emoji-tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;scrollbar-width:none;}
+    .emoji-tabs::-webkit-scrollbar{display:none;}
+    .emoji-tab{flex-shrink:0;padding:4px 10px;font-size:12px;font-weight:600;border-radius:20px;border:1.5px solid rgba(0,0,0,.15);background:rgba(0,0,0,.06);color:var(--k-text2);cursor:pointer;white-space:nowrap;font-family:inherit;}
+    .emoji-tab.on{background:var(--p-amber);border-color:var(--p-amber);color:#fff;}
     .bc-subopt{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:20px;font-size:10px;font-weight:700;color:#1E5A30;padding:2px 8px;white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
     /* Sub-option chips in menu list */
     .t-subopts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -358,20 +363,19 @@
 
 <script>
 // ── Emoji data ─────────────────────────────────────────────────────────────────
-const FOOD_EMOJIS = [
-  // Classic breakfast
-  '🥞','🍳','🥚','🧇','🥓','🍞','🥐','🥯','🥣','🧁',
-  // Drinks
-  '☕','🍵','🧋','🥤','🥛','🧃','🍊','🫖',
-  // Fruits
-  '🍓','🫐','🍌','🍎','🥝','🍇','🍑','🍉','🍋','🍒','🥭','🍐','🍍',
-  // Savory / protein
-  '🥩','🌭','🧀','🥑','🐟','🥔','🌽','🥗','🥪','🍅',
-  // Sweets & spreads
-  '🍩','🍫','🍯','🫙','🥜','🍪','🌰','🧈',
-  // International & other
-  '🌮','🌯','🥨','🧆','🍜','🍚','🥦','🍠','🥕','🫔','🥧','🥟','🫕','🥥',
-];
+const EMOJI_TABS = {
+  '🍳 Breakfast': ['🥞','🍳','🥚','🧇','🥓','🍞','🥐','🥯','🥣','🧁','🍩','🥨','🧆','🥧','🥖','🫓','🥞','🧇','🥓','🥚','🍳','🥣','🧀','🥑','🍅','🥦','🥕','🌽','🥜','🌰','🫙','🧈','🍯','🍫','🍬','🥛','☕','🍵','🧃','🥤','🫖'],
+  '🍎 Fruits & Veg': ['🍎','🍊','🍋','🍋‍🟩','🍌','🍍','🥭','🍇','🍓','🫐','🍈','🍒','🍑','🥝','🍅','🥥','🍐','🍉','🍏','🫒','🥑','🥦','🥕','🌽','🥒','🥬','🥔','🍠','🧅','🧄','🌶️','🫑','🥜','🌰','🍄','🫘','🌿','🪴','🌱'],
+  '🍕 Food': ['🍕','🍔','🌮','🌯','🥙','🫔','🥗','🥘','🍲','🫕','🍜','🍝','🍚','🍛','🍣','🍱','🥟','🍤','🍙','🍘','🍥','🍢','🥫','🌭','🥩','🐟','🦐','🦞','🦀','🦑','🦪','🍖','🍗','🥚','🧀','🥓','🥨','🧆','🧂','🫙'],
+  '🍰 Sweets': ['🍰','🎂','🧁','🍮','🍭','🍬','🍫','🍩','🍪','🍦','🍧','🍨','🥧','🍿','🍯','🥐','🥖','🍞','🥨','🥯','🧈','🫙'],
+  '☕ Drinks': ['☕','🍵','🧋','🥤','🥛','🧃','🍊','🫖','🍺','🍻','🥂','🍷','🍸','🍹','🧉','🫗','🥃','🍾','🧊','💧','🌊'],
+  '😊 Faces': ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😋','😛','😜','🤪','🤗','🤭','🤫','🤔','😐','😏','😒','🙄','😬','😌','😔','😪','🤤','😴','🥱','😷','🤒','🤕','🤢','🥵','🥶','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🥺','🥹','😢','😭','😱','😤','😡','🤬','😈','👿','💀','🤡','👻','👽','🤖','💩','🙈','🙉','🙊'],
+  '🐶 Animals': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺','🐴','🦄','🐝','🦋','🐛','🐌','🐢','🐍','🐠','🐟','🐬','🐋','🦈','🐙','🦑','🦞','🦀','🐘','🦒','🦓','🦏','🐪','🦘','🐅','🐆','🦁','🐕','🐩','🦮','🐈','🐈‍⬛','🐇','🐿️','🦔','🦦','🦥','🦨','🦝'],
+  '⭐ Symbols': ['⭐','🌟','✨','💫','🌈','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕','💖','💝','💘','💗','💓','💞','💔','❣️','🎉','🎊','🎈','🎁','🏆','🥇','🥈','🥉','🎖️','🏅','🌸','🌺','🌻','🌹','🌷','💐','🍀','☘️','🌿','🍃','☀️','🌙','⭐','🌟','✨','💫','⚡','🔥','❄️','🌈','🌊','🌍','🌎','🌏'],
+  '🎮 Fun': ['🎮','🎲','🎯','🎳','🎪','🤹','🎨','🖌️','✏️','📚','🎵','🎶','🎸','🥁','🎹','🎺','🎷','🎤','🎧','🎬','🏆','⚽','🏀','🏈','⚾','🎾','🏐','🏊','🚴','🎠','🎡','🎢','🚀','🛸','✈️','🚂','🚗','🚕','🚌','🚒','🏎️','🛹','🪁','🧩','🎭','🃏','🀄','🎴'],
+};
+const FOOD_EMOJIS = [...new Set(Object.values(EMOJI_TABS).flat())];
+let _emojiTabKey = '🍳 Breakfast';
 
 const EMOJI_HINTS = {
   // Eggs
@@ -640,47 +644,46 @@ Object.entries(EMOJI_HINTS).forEach(([word, emoji]) => {
 function buildEmojiGrid(gridId, initial) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
+  const parent = grid.parentNode;
   const searchId = `es-${gridId}`;
-  const customId = `ec-${gridId}`;
-  if (!document.getElementById(searchId)) {
-    // Search filter
+  const tabsId = `et-${gridId}`;
+  if (!document.getElementById(tabsId)) {
+    // Category tabs
+    const tabsEl = document.createElement('div');
+    tabsEl.id = tabsId;
+    tabsEl.className = 'emoji-tabs';
+    tabsEl.innerHTML = Object.keys(EMOJI_TABS).map(k =>
+      `<button class="emoji-tab${k===_emojiTabKey?' on':''}" onclick="switchEmojiTab('${gridId}','${k.replace(/'/g,"&#39;")}')">${k}</button>`
+    ).join('');
+    parent.insertBefore(tabsEl, grid);
+    // Search input
     const inp = document.createElement('input');
     inp.id = searchId;
     inp.className = 'emoji-search-inp';
     inp.placeholder = 'Search emojis... (e.g. egg, fruit, coffee)';
-    inp.addEventListener('input', () => renderEmojiButtons(grid, gridId, inp.value.trim().toLowerCase()));
-    grid.parentNode.insertBefore(inp, grid);
-    // Custom emoji paste row
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
-    row.innerHTML = `<span style="font-size:12px;color:var(--k-text2);white-space:nowrap">Or tap any emoji →</span>
-      <input id="${customId}" style="flex:1;padding:5px 8px;font-size:20px;border:1.5px solid rgba(0,0,0,.15);border-radius:8px;font-family:inherit;text-align:center;" maxlength="8" placeholder="😀">`;
-    row.querySelector('input').addEventListener('input', function() { applyCustomEmoji(this, gridId); });
-    grid.parentNode.insertBefore(row, grid);
+    inp.addEventListener('input', () => renderEmojiButtons(grid, gridId, inp.value.trim().toLowerCase(), null));
+    parent.insertBefore(inp, grid);
   } else {
-    document.getElementById(searchId).value = '';
-    const c = document.getElementById(customId);
-    if (c) c.value = '';
+    const si = document.getElementById(searchId);
+    if (si) si.value = '';
+    document.querySelectorAll(`#${tabsId} .emoji-tab`).forEach(b => b.classList.toggle('on', b.textContent === _emojiTabKey));
   }
-  renderEmojiButtons(grid, gridId, '');
+  renderEmojiButtons(grid, gridId, '', EMOJI_TABS[_emojiTabKey]);
 }
 
-function applyCustomEmoji(inp, gridId) {
-  const val = inp.value.trim();
-  if (!val) return;
-  let emoji = val;
-  try {
-    const segs = [...new Intl.Segmenter().segment(val)];
-    if (segs.length) emoji = segs[0].segment;
-  } catch(e) { emoji = [...val][0] || val; }
-  inp.value = emoji;
-  setPickerEmoji(emoji, gridId);
+function switchEmojiTab(gridId, tabKey) {
+  _emojiTabKey = tabKey;
+  const si = document.getElementById(`es-${gridId}`);
+  if (si) si.value = '';
+  document.querySelectorAll(`#et-${gridId} .emoji-tab`).forEach(b => b.classList.toggle('on', b.textContent === tabKey));
+  renderEmojiButtons(document.getElementById(gridId), gridId, '', EMOJI_TABS[tabKey]);
 }
 
-function renderEmojiButtons(grid, gridId, query) {
+function renderEmojiButtons(grid, gridId, query, pool) {
+  const source = pool || (query ? FOOD_EMOJIS : (EMOJI_TABS[_emojiTabKey] || FOOD_EMOJIS));
   const filtered = query
     ? FOOD_EMOJIS.filter(e => (EMOJI_SEARCH[e] || []).some(t => t.includes(query)))
-    : FOOD_EMOJIS;
+    : source;
   grid.innerHTML = '';
   filtered.forEach(e => {
     const btn = document.createElement('button');
