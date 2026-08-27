@@ -640,19 +640,41 @@ Object.entries(EMOJI_HINTS).forEach(([word, emoji]) => {
 function buildEmojiGrid(gridId, initial) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
-  // Insert search input as sibling before grid if not already there
   const searchId = `es-${gridId}`;
+  const customId = `ec-${gridId}`;
   if (!document.getElementById(searchId)) {
+    // Search filter
     const inp = document.createElement('input');
     inp.id = searchId;
     inp.className = 'emoji-search-inp';
     inp.placeholder = 'Search emojis... (e.g. egg, fruit, coffee)';
     inp.addEventListener('input', () => renderEmojiButtons(grid, gridId, inp.value.trim().toLowerCase()));
     grid.parentNode.insertBefore(inp, grid);
+    // Custom emoji paste row
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+    row.innerHTML = `<span style="font-size:12px;color:var(--k-text2);white-space:nowrap">Or tap any emoji →</span>
+      <input id="${customId}" style="flex:1;padding:5px 8px;font-size:20px;border:1.5px solid rgba(0,0,0,.15);border-radius:8px;font-family:inherit;text-align:center;" maxlength="8" placeholder="😀">`;
+    row.querySelector('input').addEventListener('input', function() { applyCustomEmoji(this, gridId); });
+    grid.parentNode.insertBefore(row, grid);
   } else {
     document.getElementById(searchId).value = '';
+    const c = document.getElementById(customId);
+    if (c) c.value = '';
   }
   renderEmojiButtons(grid, gridId, '');
+}
+
+function applyCustomEmoji(inp, gridId) {
+  const val = inp.value.trim();
+  if (!val) return;
+  let emoji = val;
+  try {
+    const segs = [...new Intl.Segmenter().segment(val)];
+    if (segs.length) emoji = segs[0].segment;
+  } catch(e) { emoji = [...val][0] || val; }
+  inp.value = emoji;
+  setPickerEmoji(emoji, gridId);
 }
 
 function renderEmojiButtons(grid, gridId, query) {
