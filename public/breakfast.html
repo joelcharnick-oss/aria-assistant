@@ -152,6 +152,10 @@
     .bcard.sel{border-color:rgba(255,255,255,.9);box-shadow:0 0 0 3px rgba(80,160,80,.5),0 8px 24px rgba(0,0,0,.14);}
     .bcard.sel::before{content:'✓';position:absolute;top:8px;right:8px;z-index:2;width:24px;height:24px;background:rgba(255,255,255,.9);border-radius:50%;font-size:13px;font-weight:700;color:#1E5A30;line-height:24px;text-align:center;}
     .bcard-emoji{font-size:clamp(2.8em,11vw,3.8em);line-height:1;filter:drop-shadow(1px 3px 6px rgba(0,0,0,.14));}
+    .bcard-img{width:clamp(2.8em,11vw,3.8em);height:clamp(2.8em,11vw,3.8em);object-fit:cover;border-radius:12px;filter:drop-shadow(1px 3px 6px rgba(0,0,0,.18));}
+    .t-emoji-img{width:28px;height:28px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+    .sel-emoji-img{width:36px;height:36px;object-fit:cover;border-radius:8px;}
+    .ov-img{height:.85em;width:.85em;object-fit:cover;border-radius:8px;display:inline-block;vertical-align:middle;}
     .bcard-name{font-size:clamp(.85em,3vw,1em);font-weight:600;color:rgba(0,0,0,.68);text-align:center;line-height:1.2;}
     .empty-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:60px 28px;color:var(--k-text2);text-align:center;}
     .empty-icon{font-size:3em;}
@@ -625,10 +629,36 @@ function show(id)  { ['v-setup','v-who','v-pick'].forEach(v=>document.getElement
 let pickerEmoji = '🍽';
 let editingId   = null;
 
+function isImg(e) { return !!(e && e.startsWith('data:')); }
+
+function emojiOrImg(e, imgClass) {
+  return isImg(e) ? `<img src="${e}" class="${imgClass}">` : (e || '');
+}
+
+function resizeImage(file, cb, size=80) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const s = Math.min(img.width, img.height);
+      ctx.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, size, size);
+      cb(canvas.toDataURL('image/jpeg', 0.75));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function setPickerEmoji(e, gridId) {
   pickerEmoji = e;
   const sel = document.querySelector('.sel-emoji');
-  if (sel) sel.textContent = e;
+  if (sel) {
+    if (isImg(e)) sel.innerHTML = `<img src="${e}" class="sel-emoji-img">`;
+    else sel.textContent = e;
+  }
   document.querySelectorAll(`#${gridId} .eopt`).forEach(btn => {
     btn.classList.toggle('sel', btn.dataset.e === e);
   });
@@ -678,14 +708,28 @@ function buildEmojiGrid(gridId, initial) {
       <input id="${pasteId}" type="text" inputmode="text" autocomplete="off" autocorrect="off"
         style="flex:1;padding:6px 10px;font-size:22px;text-align:center;border:1.5px solid rgba(0,0,0,.18);border-radius:8px;font-family:inherit;min-width:0;"
         placeholder="✍️ type or paste">`;
-    wrap.querySelector('input').addEventListener('input', function() {
+    const pasteInp = wrap.querySelector('input');
+    pasteInp.addEventListener('input', function() {
       const val = this.value.replace(/\s/g,'');
       if (!val) return;
-      // grab the first grapheme cluster (handles multi-codepoint emoji)
       let emoji = val;
       try { emoji = [...new Intl.Segmenter().segment(val)][0].segment; } catch(e) { emoji = [...val].slice(0,3).join(''); }
       this.value = emoji;
       setPickerEmoji(emoji, gridId);
+    });
+    pasteInp.addEventListener('paste', function(ev) {
+      const clipItems = ev.clipboardData?.items || [];
+      for (const ci of clipItems) {
+        if (ci.type.startsWith('image/')) {
+          ev.preventDefault();
+          const file = ci.getAsFile();
+          resizeImage(file, dataUrl => {
+            setPickerEmoji(dataUrl, gridId);
+            this.value = '🖼';
+          });
+          return;
+        }
+      }
     });
     grid.after(wrap);
   }
@@ -792,7 +836,11 @@ function donePicking() {
   const names  = citems.map(i => i.name).join(', ');
 
   const emojiEl = document.getElementById('ov-emoji');
-  emojiEl.textContent = emojis;
+  if (citems.some(i => isImg(i.emoji))) {
+    emojiEl.innerHTML = citems.map(i => isImg(i.emoji) ? `<img src="${i.emoji}" class="ov-img">` : i.emoji).join(' ');
+  } else {
+    emojiEl.textContent = emojis;
+  }
   emojiEl.style.fontSize = citems.length >= 4 ? '3em' : citems.length >= 3 ? '3.5em' : citems.length >= 2 ? '4em' : '5.5em';
 
   document.getElementById('ov-name').textContent = names;
@@ -1009,7 +1057,7 @@ function renderMenu() {
       </div>
       <button class="t-action-btn del" onclick="delItem('${id}',event)" title="Remove">–</button>
       <button class="t-action-btn" onclick="showEditForm('${id}',event)" title="Edit">✏️</button>
-      <span class="t-emoji">${item.emoji}</span>
+      ${isImg(item.emoji) ? `<img src="${item.emoji}" class="t-emoji-img">` : `<span class="t-emoji">${item.emoji}</span>`}
       <div style="flex:1;min-width:0">
         <div class="t-name">${esc(item.name)}</div>
         ${item.subopts?.length ? `<div class="t-subopts" id="tso-${id}">${suboptChipsHTML(id)}</div>` : ''}
@@ -1069,7 +1117,7 @@ function showAddForm() {
   document.getElementById('add-area').innerHTML = `
     <div class="item-form">
       <div class="form-top-row">
-        <div class="sel-emoji">${pickerEmoji}</div>
+        <div class="sel-emoji">${isImg(pickerEmoji)?`<img src="${pickerEmoji}" class="sel-emoji-img">`:pickerEmoji}</div>
         <input class="form-name-inp" id="new-name" placeholder="e.g. Avocado Toast" maxlength="30"
           oninput="onNameInput(this.value,'add-emoji-grid')">
       </div>
@@ -1123,7 +1171,7 @@ function showEditForm(id, e) {
   wrapper.className = 'item-form inline';
   wrapper.innerHTML = `
     <div class="form-top-row">
-      <div class="sel-emoji">${item.emoji}</div>
+      <div class="sel-emoji">${isImg(item.emoji)?`<img src="${item.emoji}" class="sel-emoji-img">`:item.emoji}</div>
       <input class="form-name-inp" id="en-${id}" value="${esc(item.name)}" placeholder="Item name" maxlength="30"
         oninput="onNameInput(this.value,'eg-${id}')">
     </div>
@@ -1245,7 +1293,7 @@ function renderWho() {
     card.className = `kcard${citems.length?' done':''}`;
     card.style.background = KPASTEL[i%KPASTEL.length];
     if (citems.length) {
-      const emojis = citems.map(it=>it.emoji).join(' ');
+      const emojisHTML = citems.map(it => isImg(it.emoji) ? `<img src="${it.emoji}" style="height:1.2em;width:1.2em;object-fit:cover;border-radius:4px;display:inline-block;vertical-align:middle;">` : it.emoji).join(' ');
       const names = (c.itemIds || (c.itemId ? [c.itemId] : [])).map(id => {
         const it = items[id]; if (!it) return null;
         const sub = c.suboptsByItem?.[id];
@@ -1254,7 +1302,7 @@ function renderWho() {
       card.innerHTML = `
         <div class="k-initial">${(name[0]||'?').toUpperCase()}</div>
         <div class="k-kname">${esc(name)}</div>
-        <div class="k-choice"><div class="k-choice-emoji">${emojis}</div><div>${names}</div></div>`;
+        <div class="k-choice"><div class="k-choice-emoji">${emojisHTML}</div><div>${names}</div></div>`;
     } else {
       card.innerHTML = `
         <div class="k-initial">${(name[0]||'?').toUpperCase()}</div>
@@ -1305,7 +1353,8 @@ function renderGrid() {
       'top:42%;left:2px;animation-delay:.7s',
       'top:42%;right:2px;animation-delay:1.2s',
     ].map(s=>`<span class="bcard-sparkle" style="${s}">✨</span>`).join('') : '';
-    card.innerHTML = `${sparkles}${isFeatured?'<div class="featured-badge">⭐ Special</div>':''}<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${subLabel?`<div class="bc-subopt">${esc(subLabel)}</div>`:''}`;
+    const emojiPart = isImg(item.emoji) ? `<img src="${item.emoji}" class="bcard-img">` : `<span class="bcard-emoji">${item.emoji}</span>`;
+    card.innerHTML = `${sparkles}${isFeatured?'<div class="featured-badge">⭐ Special</div>':''}${emojiPart}<span class="bcard-name">${esc(item.name)}</span>${subLabel?`<div class="bc-subopt">${esc(subLabel)}</div>`:''}`;
     card.addEventListener('click', () => pickItem(id));
     grid.appendChild(card);
   });
@@ -1359,7 +1408,7 @@ function showSuboptSheet(id) {
 function renderSuboptSheet() {
   const item = items[_sheetItemId];
   document.getElementById('subopt-sheet').innerHTML = `
-    <div class="subopt-title">${item.emoji} How would you like your ${esc(item.name)}?<br><span style="font-size:.65em;font-weight:400;opacity:.6">Pick as many as you want</span></div>
+    <div class="subopt-title">${isImg(item.emoji)?`<img src="${item.emoji}" style="height:1em;width:1em;object-fit:cover;border-radius:4px;vertical-align:middle;">`:item.emoji} How would you like your ${esc(item.name)}?<br><span style="font-size:.65em;font-weight:400;opacity:.6">Pick as many as you want</span></div>
     <div class="subopt-opts">${_sheetOpts.map((opt,i) =>
       `<button class="subopt-chip${_sheetSelected.has(opt)?' selected':''}" onclick="toggleSheetOpt(${i})">${esc(opt)}</button>`
     ).join('')}</div>
