@@ -669,6 +669,26 @@ function buildEmojiGrid(gridId, initial) {
     document.querySelectorAll(`#${tabsId} .emoji-tab`).forEach(b => b.classList.toggle('on', b.textContent === _emojiTabKey));
   }
   renderEmojiButtons(grid, gridId, '', EMOJI_TABS[_emojiTabKey]);
+  // Custom emoji input — always present after grid
+  const pasteId = `ep-${gridId}`;
+  if (!document.getElementById(pasteId)) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:8px;';
+    wrap.innerHTML = `<span style="font-size:12px;color:var(--k-text2);flex-shrink:0">Use any emoji:</span>
+      <input id="${pasteId}" type="text" inputmode="text" autocomplete="off" autocorrect="off"
+        style="flex:1;padding:6px 10px;font-size:22px;text-align:center;border:1.5px solid rgba(0,0,0,.18);border-radius:8px;font-family:inherit;min-width:0;"
+        placeholder="✍️ type or paste">`;
+    wrap.querySelector('input').addEventListener('input', function() {
+      const val = this.value.replace(/\s/g,'');
+      if (!val) return;
+      // grab the first grapheme cluster (handles multi-codepoint emoji)
+      let emoji = val;
+      try { emoji = [...new Intl.Segmenter().segment(val)][0].segment; } catch(e) { emoji = [...val].slice(0,3).join(''); }
+      this.value = emoji;
+      setPickerEmoji(emoji, gridId);
+    });
+    grid.after(wrap);
+  }
 }
 
 function switchEmojiTab(gridId, tabKey) {
