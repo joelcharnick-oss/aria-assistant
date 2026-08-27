@@ -190,6 +190,23 @@
     .subopt-actions{display:flex;gap:10px;margin-top:4px;}
     .subopt-actions .subopt-skip{width:auto;flex:1;}
     .subopt-actions .subopt-done{width:auto;flex:2;margin-top:0;}
+    /* Kid availability chips in setup */
+    .kid-avail-chips{display:flex;gap:4px;margin-top:5px;}
+    .kid-avail-chip{padding:2px 9px;font-size:11px;font-weight:700;border-radius:20px;border:1.5px solid rgba(0,0,0,.15);background:rgba(0,0,0,.06);color:var(--k-text2);cursor:pointer;transition:background .15s;}
+    .kid-avail-chip.on{background:#3A8C50;border-color:#3A8C50;color:#fff;}
+    /* Reorder buttons */
+    .t-reorder{display:flex;flex-direction:column;gap:1px;margin-right:2px;flex-shrink:0;}
+    .t-reorder-btn{width:20px;height:14px;font-size:9px;background:rgba(0,0,0,.07);border:none;border-radius:3px;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:var(--k-text2);}
+    .t-reorder-btn:disabled{opacity:.25;cursor:default;}
+    /* Featured star */
+    .t-star-btn{background:transparent;border:none;font-size:16px;cursor:pointer;padding:0 4px;opacity:.25;transition:opacity .15s;flex-shrink:0;}
+    .t-star-btn.on{opacity:1;}
+    /* Featured item glow on kid grid */
+    @keyframes featGlow{0%,100%{box-shadow:0 8px 24px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.07),0 0 0 0 rgba(255,200,0,0);}50%{box-shadow:0 8px 24px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.07),0 0 22px 8px rgba(255,200,0,.5);}}
+    .bcard.featured{animation:featGlow 2s ease-in-out infinite;}
+    .featured-badge{position:absolute;top:7px;right:7px;font-size:9px;font-weight:800;background:rgba(255,210,0,.95);color:#5a3a00;padding:2px 7px;border-radius:10px;letter-spacing:.02em;z-index:2;}
+    /* Emoji search */
+    .emoji-search-inp{width:100%;box-sizing:border-box;padding:5px 10px;font-size:13px;border:1.5px solid rgba(0,0,0,.15);border-radius:8px;margin-bottom:6px;font-family:inherit;outline:none;}
     .bc-subopt{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:20px;font-size:10px;font-weight:700;color:#1E5A30;padding:2px 8px;white-space:nowrap;max-width:88%;overflow:hidden;text-overflow:ellipsis;pointer-events:none;}
     /* Sub-option chips in menu list */
     .t-subopts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
@@ -511,13 +528,15 @@ const KPASTEL = [
 ];
 
 // ── Storage ────────────────────────────────────────────────────────────────────
-const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1', activeSubopts:'bf-activesubopts-v1' };
+const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1', activeSubopts:'bf-activesubopts-v1', order:'bf-order-v1', featured:'bf-featured-v1' };
 let items, active, choices, kids, history, activeSubopts;
 let serverAvailable = false;
 let historyExpanded = false;
 let _sheetOpts = [];
 let _sheetItemId = null;
 let _sheetSelected = new Set();
+let itemOrder = [];
+let featured = null;
 
 function applyState(data) {
   if (data.items && Object.keys(data.items).length) {
@@ -534,6 +553,10 @@ function applyState(data) {
   kids         = data.kids         || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))         || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
   history      = data.history      || (() => { try { return JSON.parse(localStorage.getItem(SK.history))      || []; } catch(e){ return []; } })();
   activeSubopts = data.activeSubopts || (() => { try { return JSON.parse(localStorage.getItem(SK.activeSubopts)) || {}; } catch(e){ return {}; } })();
+  itemOrder = data.itemOrder || (() => { try { return JSON.parse(localStorage.getItem(SK.order)) || Object.keys(items); } catch(e){ return Object.keys(items); } })();
+  itemOrder = itemOrder.filter(id => items[id]); // remove deleted items
+  Object.keys(items).forEach(id => { if (!itemOrder.includes(id)) itemOrder.push(id); }); // add any new items
+  featured = data.hasOwnProperty('featured') ? data.featured : (() => { try { return JSON.parse(localStorage.getItem(SK.featured)); } catch(e){ return null; } })();
   // Mirror to localStorage for offline fallback
   localStorage.setItem(SK.items,        JSON.stringify(items));
   localStorage.setItem(SK.active,       JSON.stringify([...active]));
@@ -541,6 +564,8 @@ function applyState(data) {
   localStorage.setItem(SK.kids,         JSON.stringify(kids));
   localStorage.setItem(SK.history,      JSON.stringify(history));
   localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts));
+  localStorage.setItem(SK.order,        JSON.stringify(itemOrder));
+  localStorage.setItem(SK.featured,     JSON.stringify(featured));
 }
 
 async function load() {
@@ -567,7 +592,7 @@ function pushToServer() {
   fetch('/api/breakfast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts }),
+    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured }),
   }).catch(() => {});
 }
 
@@ -578,6 +603,8 @@ const save = {
   kids()        { localStorage.setItem(SK.kids,         JSON.stringify(kids));           pushToServer(); },
   history()     { localStorage.setItem(SK.history,      JSON.stringify(history));        pushToServer(); },
   activeSubopts(){ localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts)); pushToServer(); },
+  itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));     pushToServer(); },
+  featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));      pushToServer(); },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -601,13 +628,39 @@ function setPickerEmoji(e, gridId) {
   });
 }
 
+// Build inverse search index: emoji → [search terms]
+const EMOJI_SEARCH = {};
+Object.entries(EMOJI_HINTS).forEach(([word, emoji]) => {
+  if (!EMOJI_SEARCH[emoji]) EMOJI_SEARCH[emoji] = [];
+  EMOJI_SEARCH[emoji].push(word.replace(/_/g,' '));
+});
+
 function buildEmojiGrid(gridId, initial) {
   const grid = document.getElementById(gridId);
   if (!grid) return;
+  // Insert search input as sibling before grid if not already there
+  const searchId = `es-${gridId}`;
+  if (!document.getElementById(searchId)) {
+    const inp = document.createElement('input');
+    inp.id = searchId;
+    inp.className = 'emoji-search-inp';
+    inp.placeholder = 'Search emojis... (e.g. egg, fruit, coffee)';
+    inp.addEventListener('input', () => renderEmojiButtons(grid, gridId, inp.value.trim().toLowerCase()));
+    grid.parentNode.insertBefore(inp, grid);
+  } else {
+    document.getElementById(searchId).value = '';
+  }
+  renderEmojiButtons(grid, gridId, '');
+}
+
+function renderEmojiButtons(grid, gridId, query) {
+  const filtered = query
+    ? FOOD_EMOJIS.filter(e => (EMOJI_SEARCH[e] || []).some(t => t.includes(query)))
+    : FOOD_EMOJIS;
   grid.innerHTML = '';
-  FOOD_EMOJIS.forEach(e => {
+  filtered.forEach(e => {
     const btn = document.createElement('button');
-    btn.className = `eopt${e === initial ? ' sel' : ''}`;
+    btn.className = `eopt${e === pickerEmoji ? ' sel' : ''}`;
     btn.textContent = e;
     btn.dataset.e = e;
     btn.addEventListener('click', () => setPickerEmoji(e, gridId));
@@ -889,26 +942,72 @@ function renderChoices() {
 function renderMenu() {
   const el = document.getElementById('t-list');
   el.innerHTML = '';
-  Object.keys(items).forEach(id => {
+  const orderedIds = [...itemOrder.filter(id => items[id])];
+  Object.keys(items).forEach(id => { if (!orderedIds.includes(id)) orderedIds.push(id); });
+  orderedIds.forEach((id, idx) => {
     const item = items[id];
     const on = active.has(id);
+    const isFeatured = featured === id;
+    const kidChips = kids.map(k => {
+      const allowed = !item.kidIds || item.kidIds.includes(k);
+      return `<button class="kid-avail-chip${allowed?' on':''}" onclick="toggleItemKid('${id}','${esc(k)}',event)">${esc(k)}</button>`;
+    }).join('');
     const row = document.createElement('div');
     row.className = `t-row ${on?'on':'off'}`;
     row.id = `tr-${id}`;
     row.innerHTML = `
+      <div class="t-reorder">
+        <button class="t-reorder-btn" onclick="moveItem('${id}',-1,event)"${idx===0?' disabled':''}>▲</button>
+        <button class="t-reorder-btn" onclick="moveItem('${id}',1,event)"${idx===orderedIds.length-1?' disabled':''}>▼</button>
+      </div>
       <button class="t-action-btn del" onclick="delItem('${id}',event)" title="Remove">–</button>
       <button class="t-action-btn" onclick="showEditForm('${id}',event)" title="Edit">✏️</button>
       <span class="t-emoji">${item.emoji}</span>
       <div style="flex:1;min-width:0">
         <div class="t-name">${esc(item.name)}</div>
         ${item.subopts?.length ? `<div class="t-subopts" id="tso-${id}">${suboptChipsHTML(id)}</div>` : ''}
+        <div class="kid-avail-chips">${kidChips}</div>
       </div>
+      <button class="t-star-btn${isFeatured?' on':''}" onclick="toggleFeatured('${id}',event)" title="${isFeatured?"Remove special":'Mark as today\'s special'}">⭐</button>
       <div class="t-sw"></div>`;
     row.addEventListener('click', e => {
-      if (!e.target.closest('.t-action-btn')) toggleItem(id);
+      if (!e.target.closest('.t-action-btn') && !e.target.closest('.t-reorder-btn') && !e.target.closest('.kid-avail-chip') && !e.target.closest('.t-star-btn')) toggleItem(id);
     });
     el.appendChild(row);
   });
+}
+
+function moveItem(id, dir, e) {
+  e.stopPropagation();
+  const idx = itemOrder.indexOf(id);
+  if (idx < 0) return;
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= itemOrder.length) return;
+  [itemOrder[idx], itemOrder[newIdx]] = [itemOrder[newIdx], itemOrder[idx]];
+  save.itemOrder();
+  renderMenu(); showAddBtn();
+}
+
+function toggleItemKid(id, kid, e) {
+  e.stopPropagation();
+  const item = items[id];
+  let current = item.kidIds ? [...item.kidIds] : [...kids];
+  if (current.includes(kid)) {
+    if (current.length === 1) return; // must keep at least one kid
+    current = current.filter(k => k !== kid);
+  } else {
+    current.push(kid);
+  }
+  if (current.length === kids.length) delete item.kidIds; else item.kidIds = current;
+  save.items();
+  renderMenu(); showAddBtn();
+}
+
+function toggleFeatured(id, e) {
+  e.stopPropagation();
+  featured = (featured === id) ? null : id;
+  save.featured();
+  renderMenu(); showAddBtn();
 }
 
 // ── Add item ───────────────────────────────────────────────────────────────────
@@ -956,7 +1055,8 @@ function confirmAdd() {
   items[id] = { name, emoji: pickerEmoji, custom: true, msg: 'Great choice! 🎉', ...(pendingSubopts.length ? {subopts:[...pendingSubopts]} : {}) };
   pendingSubopts = [];
   active.add(id);
-  save.items(); save.active();
+  if (!itemOrder.includes(id)) itemOrder.push(id);
+  save.items(); save.active(); save.itemOrder();
   renderMenu(); showAddBtn(); updateCount();
 }
 
@@ -1054,15 +1154,17 @@ function delItem(id, e) {
   e.stopPropagation();
   if (!confirm(`Remove "${items[id]?.name}" from the menu?`)) return;
   delete items[id]; active.delete(id);
-  save.items(); save.active();
+  itemOrder = itemOrder.filter(i => i !== id);
+  if (featured === id) featured = null;
+  save.items(); save.active(); save.itemOrder(); save.featured();
   renderMenu(); showAddBtn(); updateCount();
 }
 
 function restoreDefaults() {
   if (!confirm('Restore all default breakfast items? Your custom items will stay.')) return;
   Object.assign(items, clone(DEFAULTS));
-  Object.keys(DEFAULTS).forEach(id => active.add(id));
-  save.items(); save.active();
+  Object.keys(DEFAULTS).forEach(id => { active.add(id); if (!itemOrder.includes(id)) itemOrder.push(id); });
+  save.items(); save.active(); save.itemOrder();
   renderMenu(); showAddBtn(); updateCount();
   toast('Default items restored');
 }
@@ -1133,7 +1235,8 @@ function renderWho() {
 function renderGrid() {
   const grid = document.getElementById('card-grid');
   grid.innerHTML = '';
-  const ids = Object.keys(items).filter(id=>active.has(id));
+  const ordered = [...itemOrder.filter(id => items[id]), ...Object.keys(items).filter(id => !itemOrder.includes(id))];
+  const ids = ordered.filter(id => active.has(id) && (!items[id].kidIds || items[id].kidIds.includes(currentKid)));
   if (!ids.length) {
     grid.innerHTML = `<div class="empty-state"><div class="empty-icon">☕</div><p>Nothing on the menu.<br>Ask a grown-up to tap ⚙️!</p></div>`;
     return;
@@ -1141,11 +1244,13 @@ function renderGrid() {
   ids.forEach(id => {
     const item = items[id];
     const sub = currentSubopts[id];
+    const subLabel = sub ? (Array.isArray(sub) ? sub.join(', ') : sub) : null;
+    const isFeatured = featured === id;
     const card = document.createElement('div');
-    card.className = `bcard${currentSelections.has(id)?' sel':''}`;
+    card.className = `bcard${currentSelections.has(id)?' sel':''}${isFeatured?' featured':''}`;
     card.id = `bc-${id}`;
     card.style.background = gradOf(id);
-    card.innerHTML = `<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${sub ? `<div class="bc-subopt">${esc(sub)}</div>` : ''}`;
+    card.innerHTML = `${isFeatured?'<div class="featured-badge">⭐ Special</div>':''}<span class="bcard-emoji">${item.emoji}</span><span class="bcard-name">${esc(item.name)}</span>${subLabel?`<div class="bc-subopt">${esc(subLabel)}</div>`:''}`;
     card.addEventListener('click', () => pickItem(id));
     grid.appendChild(card);
   });
