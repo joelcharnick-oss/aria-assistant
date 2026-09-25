@@ -539,8 +539,8 @@ const KPASTEL = [
 ];
 
 // ── Storage ────────────────────────────────────────────────────────────────────
-const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1', activeSubopts:'bf-activesubopts-v1', order:'bf-order-v1', featured:'bf-featured-v1' };
-let items, active, choices, kids, history, activeSubopts;
+const SK = { items:'bf-items-v4', active:'bf-active-v4', choices:'bf-choices-v4', kids:'bf-kids-v4', history:'bf-history-v1', activeSubopts:'bf-activesubopts-v1', order:'bf-order-v1', featured:'bf-featured-v1', choicesDate:'bf-choicesdate-v1' };
+let items, active, choices, kids, history, activeSubopts, choicesDate;
 let serverAvailable = false;
 let historyExpanded = false;
 let _sheetOpts = [];
@@ -564,6 +564,17 @@ function applyState(data) {
   kids         = data.kids         || (() => { try { return JSON.parse(localStorage.getItem(SK.kids))         || ['Jonah','Lily']; } catch(e){ return ['Jonah','Lily']; } })();
   history      = data.history      || (() => { try { return JSON.parse(localStorage.getItem(SK.history))      || []; } catch(e){ return []; } })();
   activeSubopts = data.activeSubopts || (() => { try { return JSON.parse(localStorage.getItem(SK.activeSubopts)) || {}; } catch(e){ return {}; } })();
+  choicesDate  = data.choicesDate  || (() => { try { return localStorage.getItem(SK.choicesDate) || null; } catch(e){ return null; } })();
+  // Auto-reset today's picks when the calendar day has rolled over, so nobody
+  // has to remember to tap "Reset & hand to kids" the night before. History is
+  // untouched — each pick was already logged permanently at the moment it was made.
+  const _todayKey = new Date().toLocaleDateString('en-CA');
+  const _dayRolledOver = choicesDate !== _todayKey;
+  if (_dayRolledOver) {
+    choices = {};
+    activeSubopts = {};
+    choicesDate = _todayKey;
+  }
   itemOrder = data.itemOrder || (() => { try { return JSON.parse(localStorage.getItem(SK.order)) || Object.keys(items); } catch(e){ return Object.keys(items); } })();
   itemOrder = itemOrder.filter(id => items[id]); // remove deleted items
   Object.keys(items).forEach(id => { if (!itemOrder.includes(id)) itemOrder.push(id); }); // add any new items
@@ -577,6 +588,9 @@ function applyState(data) {
   localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts));
   localStorage.setItem(SK.order,        JSON.stringify(itemOrder));
   localStorage.setItem(SK.featured,     JSON.stringify(featured));
+  localStorage.setItem(SK.choicesDate,  choicesDate);
+  // Let the server (and thus any other device) know today's picks were cleared.
+  if (_dayRolledOver) pushToServer();
 }
 
 async function load() {
@@ -603,7 +617,7 @@ function pushToServer() {
   fetch('/api/breakfast', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured }),
+    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured, choicesDate }),
   }).catch(() => {});
 }
 
