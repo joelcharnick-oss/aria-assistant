@@ -1635,8 +1635,7 @@ function toast(msg){
 })();
 
 // Re-sync when the app is brought back into focus on any device
-document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) return;
+async function syncFromServer() {
   const before = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
   await load();
   const after = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
@@ -1645,7 +1644,20 @@ document.addEventListener('visibilitychange', async () => {
   const cur = ['v-setup','v-who','v-pick'].find(v => !document.getElementById(v).classList.contains('hidden'));
   if (cur === 'v-setup') renderSetup();
   else if (cur === 'v-who') renderWho();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  syncFromServer();
 });
+
+// Belt-and-suspenders for a device (like a kitchen iPad) that's saved to the
+// home screen and just resumed from the app switcher rather than relaunched:
+// iOS keeps running whatever JS was loaded at the last real launch, with no
+// visibilitychange and no fresh fetch, so the day-rollover reset in
+// applyState() could otherwise sit stale for days. Re-syncing periodically
+// re-runs that same check so an already-open tab self-heals on its own.
+setInterval(syncFromServer, 5 * 60 * 1000); // every 5 minutes
 </script>
 </body>
 </html>
