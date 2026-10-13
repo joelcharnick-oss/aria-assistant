@@ -590,7 +590,7 @@ function applyState(data) {
   localStorage.setItem(SK.featured,     JSON.stringify(featured));
   localStorage.setItem(SK.choicesDate,  choicesDate);
   // Let the server (and thus any other device) know today's picks were cleared.
-  if (_dayRolledOver) pushToServer();
+  if (_dayRolledOver) pushToServer(['choices', 'activeSubopts', 'choicesDate']);
 }
 
 async function load() {
@@ -612,24 +612,44 @@ async function load() {
 
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
-function pushToServer() {
+function localStateSnapshot() {
+  return { items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured, choicesDate };
+}
+
+// Fetches the latest server state and overlays only the changed field(s) on
+// top of it, so a stale tab can't clobber fields another device updated in
+// the meantime. changedKeys may be a single key or an array of keys.
+async function pushToServer(changedKeys) {
   if (!serverAvailable) return;
-  fetch('/api/breakfast', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured, choicesDate }),
-  }).catch(() => {});
+  const keys = changedKeys == null ? [] : (Array.isArray(changedKeys) ? changedKeys : [changedKeys]);
+  try {
+    let latest = {};
+    try {
+      const resp = await fetch('/api/breakfast');
+      if (resp.ok) latest = await resp.json();
+    } catch (e) { /* fall back to pushing local state as-is */ }
+    const local = localStateSnapshot();
+    const overrides = {};
+    keys.forEach(k => { overrides[k] = local[k]; });
+    const merged = { ...local, ...latest, ...overrides };
+    await fetch('/api/breakfast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    applyState(merged);
+  } catch (e) { /* offline — localStorage already has the change */ }
 }
 
 const save = {
-  items()       { localStorage.setItem(SK.items,        JSON.stringify(items));         pushToServer(); },
-  active()      { localStorage.setItem(SK.active,       JSON.stringify([...active]));   pushToServer(); },
-  choices()     { localStorage.setItem(SK.choices,      JSON.stringify(choices));        pushToServer(); },
-  kids()        { localStorage.setItem(SK.kids,         JSON.stringify(kids));           pushToServer(); },
-  history()     { localStorage.setItem(SK.history,      JSON.stringify(history));        pushToServer(); },
-  activeSubopts(){ localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts)); pushToServer(); },
-  itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));     pushToServer(); },
-  featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));      pushToServer(); },
+  items()       { localStorage.setItem(SK.items,        JSON.stringify(items));         pushToServer('items'); },
+  active()      { localStorage.setItem(SK.active,       JSON.stringify([...active]));   pushToServer('active'); },
+  choices()     { localStorage.setItem(SK.choices,      JSON.stringify(choices));        pushToServer('choices'); },
+  kids()        { localStorage.setItem(SK.kids,         JSON.stringify(kids));           pushToServer('kids'); },
+  history()     { localStorage.setItem(SK.history,      JSON.stringify(history));        pushToServer('history'); },
+  activeSubopts(){ localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts)); pushToServer('activeSubopts'); },
+  itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));     pushToServer('itemOrder'); },
+  featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));      pushToServer('featured'); },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
