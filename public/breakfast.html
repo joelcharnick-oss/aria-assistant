@@ -619,8 +619,20 @@ function localStateSnapshot() {
 // Fetches the latest server state and overlays only the changed field(s) on
 // top of it, so a stale tab can't clobber fields another device updated in
 // the meantime. changedKeys may be a single key or an array of keys.
-async function pushToServer(changedKeys) {
+//
+// Calls are chained through _pushChain so each GET-merge-POST fully finishes
+// before the next one starts — otherwise two saves fired back-to-back (e.g.
+// choices then history on every pick) can each fetch the same "latest"
+// before the other's write lands, and the second one's merge then overwrites
+// the first one's change back to its old value.
+let _pushChain = Promise.resolve();
+function pushToServer(changedKeys) {
   if (!serverAvailable) return;
+  _pushChain = _pushChain.then(() => doPushToServer(changedKeys));
+  return _pushChain;
+}
+
+async function doPushToServer(changedKeys) {
   const keys = changedKeys == null ? [] : (Array.isArray(changedKeys) ? changedKeys : [changedKeys]);
   try {
     let latest = {};
@@ -637,7 +649,6 @@ async function pushToServer(changedKeys) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(merged),
     });
-    applyState(merged);
   } catch (e) { /* offline — localStorage already has the change */ }
 }
 
