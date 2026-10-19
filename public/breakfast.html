@@ -674,6 +674,7 @@ function show(id)  { ['v-setup','v-who','v-pick'].forEach(v=>document.getElement
 // ── Emoji picker state ─────────────────────────────────────────────────────────
 let pickerEmoji = '🍽';
 let editingId   = null;
+let formOpen    = false; // true while an add/edit item form is open and unsaved
 
 function isImg(e) { return !!(e && e.startsWith('data:')); }
 
@@ -1153,11 +1154,13 @@ function toggleFeatured(id, e) {
 
 // ── Add item ───────────────────────────────────────────────────────────────────
 function showAddBtn() {
+  formOpen = false;
   document.getElementById('add-area').innerHTML =
     `<button class="dashed-btn" style="width:100%;justify-content:center" onclick="showAddForm()">+ Add item</button>`;
 }
 
 function showAddForm() {
+  formOpen = true;
   pickerEmoji = '🍽';
   pendingSubopts = [];
   document.getElementById('add-area').innerHTML = `
@@ -1204,6 +1207,7 @@ function confirmAdd() {
 // ── Edit item ──────────────────────────────────────────────────────────────────
 function showEditForm(id, e) {
   e.stopPropagation();
+  formOpen = true;
   const item = items[id];
   pickerEmoji = item.emoji;
   editingId = id;
@@ -1667,6 +1671,11 @@ function toast(msg){
 
 // Re-sync when the app is brought back into focus on any device
 async function syncFromServer() {
+  // Don't pull in server state (or re-render) while the parent has an
+  // add/edit item form open, or is typing anywhere — the resync would wipe
+  // whatever they haven't saved yet.
+  const typing = document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName);
+  if (formOpen || typing) return;
   const before = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
   await load();
   const after = JSON.stringify({ items, active: [...active], choices, kids, activeSubopts });
