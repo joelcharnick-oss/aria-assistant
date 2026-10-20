@@ -593,7 +593,24 @@ function applyState(data) {
   if (_dayRolledOver) pushToServer(['choices', 'activeSubopts', 'choicesDate']);
 }
 
-async function load() {
+// All reads (load) and writes (pushToServer) to /api/breakfast go through
+// this single chain so they run strictly one at a time. Without this, the
+// background re-sync (every 5 min, or on tab refocus) can fire a GET while a
+// pick is still mid-save, read the pre-save state, and overwrite the kid's
+// just-made choice in memory — which then gets pushed back to the server by
+// the very next save, erasing it (and its history entry) for good.
+let _syncChain = Promise.resolve();
+function queueSync(fn) {
+  const p = _syncChain.then(fn, fn);
+  _syncChain = p.catch(() => {});
+  return p;
+}
+
+function load() {
+  return queueSync(doLoad);
+}
+
+async function doLoad() {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3000);
@@ -619,17 +636,9 @@ function localStateSnapshot() {
 // Fetches the latest server state and overlays only the changed field(s) on
 // top of it, so a stale tab can't clobber fields another device updated in
 // the meantime. changedKeys may be a single key or an array of keys.
-//
-// Calls are chained through _pushChain so each GET-merge-POST fully finishes
-// before the next one starts — otherwise two saves fired back-to-back (e.g.
-// choices then history on every pick) can each fetch the same "latest"
-// before the other's write lands, and the second one's merge then overwrites
-// the first one's change back to its old value.
-let _pushChain = Promise.resolve();
 function pushToServer(changedKeys) {
   if (!serverAvailable) return;
-  _pushChain = _pushChain.then(() => doPushToServer(changedKeys));
-  return _pushChain;
+  return queueSync(() => doPushToServer(changedKeys));
 }
 
 async function doPushToServer(changedKeys) {
