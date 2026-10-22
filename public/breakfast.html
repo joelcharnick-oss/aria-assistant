@@ -590,27 +590,10 @@ function applyState(data) {
   localStorage.setItem(SK.featured,     JSON.stringify(featured));
   localStorage.setItem(SK.choicesDate,  choicesDate);
   // Let the server (and thus any other device) know today's picks were cleared.
-  if (_dayRolledOver) pushToServer(['choices', 'activeSubopts', 'choicesDate']);
+  if (_dayRolledOver) pushToServer({ fields: { choices, activeSubopts, choicesDate } });
 }
 
-// All reads (load) and writes (pushToServer) to /api/breakfast go through
-// this single chain so they run strictly one at a time. Without this, the
-// background re-sync (every 5 min, or on tab refocus) can fire a GET while a
-// pick is still mid-save, read the pre-save state, and overwrite the kid's
-// just-made choice in memory — which then gets pushed back to the server by
-// the very next save, erasing it (and its history entry) for good.
-let _syncChain = Promise.resolve();
-function queueSync(fn) {
-  const p = _syncChain.then(fn, fn);
-  _syncChain = p.catch(() => {});
-  return p;
-}
-
-function load() {
-  return queueSync(doLoad);
-}
-
-async function doLoad() {
+async function load() {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 3000);
@@ -629,47 +612,45 @@ async function doLoad() {
 
 function clone(o){ return JSON.parse(JSON.stringify(o)); }
 
-function localStateSnapshot() {
-  return { items, active: [...active], choices, kids, history, activeSubopts, itemOrder, featured, choicesDate };
-}
-
-// Fetches the latest server state and overlays only the changed field(s) on
-// top of it, so a stale tab can't clobber fields another device updated in
-// the meantime. changedKeys may be a single key or an array of keys.
-function pushToServer(changedKeys) {
+// Sends a patch describing only what changed — never the whole local state —
+// so the server (which merges every patch against its own current copy,
+// one at a time) can never be told to overwrite a field this device hasn't
+// even seen the latest value of. See server.js for the merge logic; that's
+// where the actual safety against concurrent devices/tabs lives now.
+function pushToServer(patch) {
   if (!serverAvailable) return;
-  return queueSync(() => doPushToServer(changedKeys));
-}
-
-async function doPushToServer(changedKeys) {
-  const keys = changedKeys == null ? [] : (Array.isArray(changedKeys) ? changedKeys : [changedKeys]);
-  try {
-    let latest = {};
-    try {
-      const resp = await fetch('/api/breakfast');
-      if (resp.ok) latest = await resp.json();
-    } catch (e) { /* fall back to pushing local state as-is */ }
-    const local = localStateSnapshot();
-    const overrides = {};
-    keys.forEach(k => { overrides[k] = local[k]; });
-    const merged = { ...local, ...latest, ...overrides };
-    await fetch('/api/breakfast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(merged),
-    });
-  } catch (e) { /* offline — localStorage already has the change */ }
+  fetch('/api/breakfast', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  }).catch(() => {});
 }
 
 const save = {
-  items()       { localStorage.setItem(SK.items,        JSON.stringify(items));         pushToServer('items'); },
-  active()      { localStorage.setItem(SK.active,       JSON.stringify([...active]));   pushToServer('active'); },
-  choices()     { localStorage.setItem(SK.choices,      JSON.stringify(choices));        pushToServer('choices'); },
-  kids()        { localStorage.setItem(SK.kids,         JSON.stringify(kids));           pushToServer('kids'); },
-  history()     { localStorage.setItem(SK.history,      JSON.stringify(history));        pushToServer('history'); },
-  activeSubopts(){ localStorage.setItem(SK.activeSubopts,JSON.stringify(activeSubopts)); pushToServer('activeSubopts'); },
-  itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));     pushToServer('itemOrder'); },
-  featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));      pushToServer('featured'); },
+  items()        { localStorage.setItem(SK.items,         JSON.stringify(items));         pushToServer({ fields: { items } }); },
+  active()       { localStorage.setItem(SK.active,        JSON.stringify([...active]));   pushToServer({ fields: { active: [...active] } }); },
+  kids()         { localStorage.setItem(SK.kids,          JSON.stringify(kids));           pushToServer({ fields: { kids } }); },
+  activeSubopts(){ localStorage.setItem(SK.activeSubopts, JSON.stringify(activeSubopts));  pushToServer({ fields: { activeSubopts } }); },
+  itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));      pushToServer({ fields: { itemOrder } }); },
+  featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));       pushToServer({ fields: { featured } }); },
+  // Explicit full reset only (e.g. "Reset & hand to kids") — a deliberate
+  // clear-everyone's-picks action, not a single kid's pick. For an
+  // individual pick use choiceForKid(), which patches just that kid's
+  // entry so it can't race with another kid's pick landing around the
+  // same time.
+  choices()      { localStorage.setItem(SK.choices,       JSON.stringify(choices));        pushToServer({ fields: { choices } }); },
+  choiceForKid(kidName) {
+    localStorage.setItem(SK.choices, JSON.stringify(choices));
+    pushToServer({ choicesPatch: { [kidName]: choices[kidName] } });
+  },
+  historyAppend(entry) {
+    localStorage.setItem(SK.history, JSON.stringify(history));
+    pushToServer({ historyAppend: [entry] });
+  },
+  historyClear() {
+    localStorage.setItem(SK.history, JSON.stringify(history));
+    pushToServer({ historyClear: true });
+  },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -871,18 +852,19 @@ function donePicking() {
   const selectedIds = [...currentSelections];
   const suboptsForSave = Object.fromEntries(Object.entries(currentSubopts).map(([k,v])=>[k,Array.isArray(v)?v.join(', '):v]));
   choices[currentKid] = { itemIds: selectedIds, suboptsByItem: suboptsForSave, time: t };
-  save.choices();
+  save.choiceForKid(currentKid);
 
   const citems = selectedIds.map(id => items[id]).filter(Boolean);
   // Append to permanent history with a snapshot so deleted items still show
-  history.push({
+  const historyEntry = {
     kid: currentKid,
     itemIds: selectedIds,
     suboptsByItem: suboptsForSave,
     snapshot: Object.fromEntries(selectedIds.map(id => [id, { name: items[id]?.name, emoji: items[id]?.emoji }])),
     ts: Date.now(),
-  });
-  save.history();
+  };
+  history.push(historyEntry);
+  save.historyAppend(historyEntry);
   currentSelections = new Set();
   currentSubopts = {};
 
@@ -1008,7 +990,7 @@ function clearHistory() {
   if (!history.length) return;
   history = [];
   historyExpanded = false;
-  save.history();
+  save.historyClear();
   renderHistory();
   toast('History cleared');
 }

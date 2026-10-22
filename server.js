@@ -83,32 +83,70 @@ async function redisCmd(...args) {
   return result;
 }
 
-async function redisGet() {
-  const result = await redisCmd('GET', 'breakfast-data');
-  return result ? JSON.parse(result) : null;
+async function readBreakfastData() {
+  if (REDIS_URL && REDIS_TOKEN) {
+    const result = await redisCmd('GET', 'breakfast-data');
+    return result ? JSON.parse(result) : {};
+  }
+  return fs.existsSync(BREAKFAST_FILE) ? JSON.parse(fs.readFileSync(BREAKFAST_FILE, 'utf8')) : {};
 }
 
-async function redisSet(data) {
-  await redisCmd('SET', 'breakfast-data', JSON.stringify(data));
+async function writeBreakfastData(data) {
+  if (REDIS_URL && REDIS_TOKEN) {
+    await redisCmd('SET', 'breakfast-data', JSON.stringify(data));
+  } else {
+    fs.writeFileSync(BREAKFAST_FILE, JSON.stringify(data, null, 2));
+  }
+}
+
+// Every write to the shared breakfast state is funneled through this single
+// in-process queue. Two devices (or two browser tabs) can save around the
+// same moment; without this, each one reads "current" independently and
+// writes back a full copy, so whichever write lands second overwrites
+// whatever the other one just added. Serializing read-modify-write here
+// means each save fully finishes before the next one is even read, so
+// nothing gets lost no matter how many devices or tabs are hitting this
+// at once. (This only serializes within one server process — fine here
+// since this app runs as a single instance.)
+let _writeChain = Promise.resolve();
+function serialize(fn) {
+  const p = _writeChain.then(fn, fn);
+  _writeChain = p.catch(() => {});
+  return p;
 }
 
 app.get('/api/breakfast', async (req, res) => {
   try {
-    if (REDIS_URL && REDIS_TOKEN) {
-      res.json(await redisGet() || {});
-    } else {
-      res.json(fs.existsSync(BREAKFAST_FILE) ? JSON.parse(fs.readFileSync(BREAKFAST_FILE, 'utf8')) : {});
-    }
+    res.json(await readBreakfastData());
   } catch (e) { res.json({}); }
 });
 
+// Body is a patch describing only what changed, never the whole state:
+//   fields:        top-level keys to overwrite as-is (items, active, kids,
+//                  itemOrder, featured, choicesDate, activeSubopts)
+//   choicesPatch:  { [kidName]: choiceEntry } merged into current.choices
+//                  per-kid, so two kids picking around the same time never
+//                  stomp each other's choice
+//   historyAppend: [entry, ...] appended to current.history (never replaces it)
+//   historyClear:  true empties current.history
 app.post('/api/breakfast', async (req, res) => {
   try {
-    if (REDIS_URL && REDIS_TOKEN) {
-      await redisSet(req.body);
-    } else {
-      fs.writeFileSync(BREAKFAST_FILE, JSON.stringify(req.body, null, 2));
-    }
+    await serialize(async () => {
+      const current = await readBreakfastData();
+      const { fields, choicesPatch, historyAppend, historyClear } = req.body || {};
+      if (fields && typeof fields === 'object') {
+        Object.assign(current, fields);
+      }
+      if (choicesPatch && typeof choicesPatch === 'object') {
+        current.choices = { ...(current.choices || {}), ...choicesPatch };
+      }
+      if (historyClear) {
+        current.history = [];
+      } else if (Array.isArray(historyAppend) && historyAppend.length) {
+        current.history = [...(current.history || []), ...historyAppend];
+      }
+      await writeBreakfastData(current);
+    });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
