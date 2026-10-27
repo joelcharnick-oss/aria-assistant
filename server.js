@@ -118,7 +118,14 @@ function serialize(fn) {
 app.get('/api/breakfast', async (req, res) => {
   try {
     res.json(await readBreakfastData());
-  } catch (e) { res.json({}); }
+  } catch (e) {
+    // Don't mask a storage failure as "the server has no data" (200 {}) —
+    // that looks identical to a legitimately empty store and would make the
+    // client fall back to applying an empty state. Fail loudly so the client
+    // falls back to its own local copy instead, which is still correct.
+    console.error('Breakfast GET failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Body is a patch describing only what changed, never the whole state:
