@@ -129,20 +129,55 @@ app.get('/api/breakfast', async (req, res) => {
 });
 
 // Body is a patch describing only what changed, never the whole state:
-//   fields:        top-level keys to overwrite as-is (items, active, kids,
-//                  itemOrder, featured, choicesDate, activeSubopts)
-//   choicesPatch:  { [kidName]: choiceEntry } merged into current.choices
-//                  per-kid, so two kids picking around the same time never
-//                  stomp each other's choice
-//   historyAppend: [entry, ...] appended to current.history (never replaces it)
-//   historyClear:  true empties current.history
+//   fields:          top-level keys to overwrite as-is — only for genuinely
+//                    bulk/explicit actions (restoring all defaults, a
+//                    reorder, kids list edits). Anything that changes one
+//                    item/kid/entry at a time uses one of the per-key patches
+//                    below instead, so two edits landing around the same
+//                    moment (one device toggling item A, another editing
+//                    item B; a day-rollover reset racing a parent's edit;
+//                    a background resync re-reading mid-edit) merge instead
+//                    of one overwriting the other's change wholesale.
+//   itemsPatch:      { [itemId]: itemData } merged into current.items
+//   itemsDelete:     [itemId, ...] removed from current.items
+//   activeAdd:       [itemId, ...] added to current.active
+//   activeRemove:    [itemId, ...] removed from current.active
+//   itemOrderAppend: [itemId, ...] appended to current.itemOrder (if absent)
+//   itemOrderRemove: [itemId, ...] removed from current.itemOrder
+//   choicesPatch:    { [kidName]: choiceEntry } merged into current.choices
+//                    per-kid, so two kids picking around the same time never
+//                    stomp each other's choice
+//   historyAppend:   [entry, ...] appended to current.history (never replaces it)
+//   historyClear:    true empties current.history
 app.post('/api/breakfast', async (req, res) => {
   try {
     await serialize(async () => {
       const current = await readBreakfastData();
-      const { fields, choicesPatch, historyAppend, historyClear } = req.body || {};
+      const {
+        fields, itemsPatch, itemsDelete, activeAdd, activeRemove,
+        itemOrderAppend, itemOrderRemove, choicesPatch, historyAppend, historyClear,
+      } = req.body || {};
       if (fields && typeof fields === 'object') {
         Object.assign(current, fields);
+      }
+      if (itemsPatch && typeof itemsPatch === 'object') {
+        current.items = { ...(current.items || {}), ...itemsPatch };
+      }
+      if (Array.isArray(itemsDelete) && itemsDelete.length) {
+        current.items = { ...(current.items || {}) };
+        itemsDelete.forEach(id => delete current.items[id]);
+      }
+      if (Array.isArray(activeAdd) && activeAdd.length) {
+        current.active = [...new Set([...(current.active || []), ...activeAdd])];
+      }
+      if (Array.isArray(activeRemove) && activeRemove.length) {
+        current.active = (current.active || []).filter(id => !activeRemove.includes(id));
+      }
+      if (Array.isArray(itemOrderAppend) && itemOrderAppend.length) {
+        current.itemOrder = [...new Set([...(current.itemOrder || []), ...itemOrderAppend])];
+      }
+      if (Array.isArray(itemOrderRemove) && itemOrderRemove.length) {
+        current.itemOrder = (current.itemOrder || []).filter(id => !itemOrderRemove.includes(id));
       }
       if (choicesPatch && typeof choicesPatch === 'object') {
         current.choices = { ...(current.choices || {}), ...choicesPatch };

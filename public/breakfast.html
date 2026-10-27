@@ -646,12 +646,44 @@ function pushToServer(patch, attempt = 1) {
 }
 
 const save = {
+  // Whole-field overwrites — only correct for genuinely bulk/explicit
+  // actions (restoring all defaults, a manual reorder, editing the kids
+  // list). A single item/kid/pick change should use one of the per-key
+  // patch methods below instead, so it can't race with another edit
+  // landing around the same moment and stomp it.
   items()        { localStorage.setItem(SK.items,         JSON.stringify(items));         pushToServer({ fields: { items } }); },
   active()       { localStorage.setItem(SK.active,        JSON.stringify([...active]));   pushToServer({ fields: { active: [...active] } }); },
   kids()         { localStorage.setItem(SK.kids,          JSON.stringify(kids));           pushToServer({ fields: { kids } }); },
   activeSubopts(){ localStorage.setItem(SK.activeSubopts, JSON.stringify(activeSubopts));  pushToServer({ fields: { activeSubopts } }); },
   itemOrder()    { localStorage.setItem(SK.order,         JSON.stringify(itemOrder));      pushToServer({ fields: { itemOrder } }); },
   featured()     { localStorage.setItem(SK.featured,      JSON.stringify(featured));       pushToServer({ fields: { featured } }); },
+  // Per-item patches — safe to fire from any single add/edit/toggle without
+  // waiting for a batch save, and safe if another device touches a
+  // *different* item at the same time.
+  itemPatch(id) {
+    localStorage.setItem(SK.items, JSON.stringify(items));
+    pushToServer({ itemsPatch: { [id]: items[id] } });
+  },
+  itemDelete(id) {
+    localStorage.setItem(SK.items, JSON.stringify(items));
+    pushToServer({ itemsDelete: [id] });
+  },
+  activeAdd(ids) {
+    localStorage.setItem(SK.active, JSON.stringify([...active]));
+    pushToServer({ activeAdd: Array.isArray(ids) ? ids : [ids] });
+  },
+  activeRemove(ids) {
+    localStorage.setItem(SK.active, JSON.stringify([...active]));
+    pushToServer({ activeRemove: Array.isArray(ids) ? ids : [ids] });
+  },
+  itemOrderAppend(ids) {
+    localStorage.setItem(SK.order, JSON.stringify(itemOrder));
+    pushToServer({ itemOrderAppend: Array.isArray(ids) ? ids : [ids] });
+  },
+  itemOrderRemove(id) {
+    localStorage.setItem(SK.order, JSON.stringify(itemOrder));
+    pushToServer({ itemOrderRemove: [id] });
+  },
   // Explicit full reset only (e.g. "Reset & hand to kids") — a deliberate
   // clear-everyone's-picks action, not a single kid's pick. For an
   // individual pick use choiceForKid(), which patches just that kid's
@@ -839,8 +871,12 @@ function goSetup() {
 }
 
 function goWho() {
+  // active no longer needs a batch save here — toggleItem() (and every
+  // other item/active change) now saves itself immediately per-item, so
+  // there's nothing pending to flush. A whole-field save.active() here
+  // would actually be harmful: it could overwrite a change another device
+  // made in the meantime with this device's (possibly stale) full copy.
   syncKidsFromDOM();
-  save.active(); save.kids();
   renderWho();
   show('v-who');
 }
@@ -1176,7 +1212,7 @@ function toggleItemKid(id, kid, e) {
     current.push(kid);
   }
   if (current.length === kids.length) delete item.kidIds; else item.kidIds = current;
-  save.items();
+  save.itemPatch(id);
   renderMenu(); showAddBtn();
 }
 
@@ -1235,7 +1271,7 @@ function confirmAdd() {
   pendingSubopts = [];
   active.add(id);
   if (!itemOrder.includes(id)) itemOrder.push(id);
-  save.items(); save.active(); save.itemOrder();
+  save.itemPatch(id); save.activeAdd(id); save.itemOrderAppend(id);
   renderMenu(); showAddBtn(); updateCount();
 }
 
@@ -1289,7 +1325,7 @@ function confirmEdit(id) {
   const subopts = items[id]?.subopts || [];
   items[id] = { ...items[id], name, emoji: pickerEmoji };
   if (subopts.length) items[id].subopts = subopts; else delete items[id].subopts;
-  save.items();
+  save.itemPatch(id);
   editingId = null;
   renderMenu(); showAddBtn(); updateCount();
 }
@@ -1324,7 +1360,14 @@ function toggleSubopt(id, idx, e) {
 }
 
 function toggleItem(id) {
-  if (active.has(id)) active.delete(id); else active.add(id);
+  // This used to only update the in-memory Set, relying on a later batch
+  // save() when the parent left the setup screen — so a toggle that hadn't
+  // been batched yet could be silently reverted by a background resync
+  // landing in between, or just never saved if the parent closed the tab.
+  // Saving immediately (and per-item) means a toggle is safe the instant
+  // it happens, and can't collide with another device's change elsewhere.
+  if (active.has(id)) { active.delete(id); save.activeRemove(id); }
+  else                { active.add(id);    save.activeAdd(id); }
   const row = document.getElementById(`tr-${id}`);
   if (row) { row.classList.toggle('on',active.has(id)); row.classList.toggle('off',!active.has(id)); }
   updateCount();
@@ -1335,16 +1378,20 @@ function delItem(id, e) {
   if (!confirm(`Remove "${items[id]?.name}" from the menu?`)) return;
   delete items[id]; active.delete(id);
   itemOrder = itemOrder.filter(i => i !== id);
-  if (featured === id) featured = null;
-  save.items(); save.active(); save.itemOrder(); save.featured();
+  save.itemDelete(id); save.activeRemove(id); save.itemOrderRemove(id);
+  if (featured === id) { featured = null; save.featured(); }
   renderMenu(); showAddBtn(); updateCount();
 }
 
 function restoreDefaults() {
   if (!confirm('Restore all default breakfast items? Your custom items will stay.')) return;
-  Object.assign(items, clone(DEFAULTS));
+  const defaults = clone(DEFAULTS);
+  Object.assign(items, defaults);
   Object.keys(DEFAULTS).forEach(id => { active.add(id); if (!itemOrder.includes(id)) itemOrder.push(id); });
-  save.items(); save.active(); save.itemOrder();
+  localStorage.setItem(SK.items, JSON.stringify(items));
+  pushToServer({ itemsPatch: defaults });
+  save.activeAdd(Object.keys(DEFAULTS));
+  save.itemOrderAppend(Object.keys(DEFAULTS));
   renderMenu(); showAddBtn(); updateCount();
   toast('Default items restored');
 }
@@ -1356,9 +1403,12 @@ function updateCount() {
 }
 
 function resetAndGo() {
+  // syncKidsFromDOM() already saves kids itself, and nothing here touches
+  // `active` — that leftover save.active() was a no-op at best and, like
+  // in goWho(), a whole-field overwrite risk at worst.
   syncKidsFromDOM();
   choices = {}; activeSubopts = {};
-  save.choices(); save.activeSubopts(); save.active(); save.kids();
+  save.choices(); save.activeSubopts();
   renderWho();
   show('v-who');
 }
