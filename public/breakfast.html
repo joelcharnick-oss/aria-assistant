@@ -593,8 +593,16 @@ function applyState(data) {
   localStorage.setItem(SK.order,        JSON.stringify(itemOrder));
   localStorage.setItem(SK.featured,     JSON.stringify(featured));
   localStorage.setItem(SK.choicesDate,  choicesDate);
-  // Let the server (and thus any other device) know today's picks were cleared.
-  if (_dayRolledOver) pushToServer({ fields: { choices, activeSubopts, choicesDate } });
+  // Tell the server a new day started, so it can clear choices/activeSubopts
+  // — but let the SERVER decide whether that's still true by the time this
+  // request is actually processed (see dayRollover handling in server.js).
+  // This used to push { fields: { choices, activeSubopts, choicesDate } }
+  // directly, a blind whole-field overwrite — every device independently
+  // notices the rollover and fires this on its own first load of the day,
+  // which is exactly the same morning window kids are picking breakfast in,
+  // so a second device's (now-stale) reset request landing after a pick
+  // had already wiped that pick on arrival.
+  if (_dayRolledOver) pushToServer({ dayRollover: _todayKey });
 }
 
 async function load() {
@@ -692,7 +700,12 @@ const save = {
   choices()      { localStorage.setItem(SK.choices,       JSON.stringify(choices));        pushToServer({ fields: { choices } }); },
   choiceForKid(kidName) {
     localStorage.setItem(SK.choices, JSON.stringify(choices));
-    pushToServer({ choicesPatch: { [kidName]: choices[kidName] } });
+    // patchDate tells the server what day this device believes it is, so a
+    // pick that arrives before this device's own day-rollover request has
+    // landed can still trigger that rollover itself, atomically, instead of
+    // being recorded under a stale day and then wiped when the rollover
+    // request catches up afterward.
+    pushToServer({ choicesPatch: { [kidName]: choices[kidName] }, patchDate: choicesDate });
   },
   historyAppend(entry) {
     localStorage.setItem(SK.history, JSON.stringify(history));

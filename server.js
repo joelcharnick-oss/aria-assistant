@@ -147,6 +147,14 @@ app.get('/api/breakfast', async (req, res) => {
 //   choicesPatch:    { [kidName]: choiceEntry } merged into current.choices
 //                    per-kid, so two kids picking around the same time never
 //                    stomp each other's choice
+//   dayRollover:     "YYYY-MM-DD" — clears choices/activeSubopts for a new
+//                    day, but ONLY if current.choicesDate isn't already that
+//                    date. Every device independently notices a new day and
+//                    sends this on load, so this has to be a no-op once
+//                    someone's already rolled the day over — otherwise a
+//                    second device's rollover request landing after a kid's
+//                    pick (both are plausible around the same morning
+//                    window) would wipe that pick via a blind overwrite.
 //   historyAppend:   [entry, ...] appended to current.history (never replaces it)
 //   historyClear:    true empties current.history
 app.post('/api/breakfast', async (req, res) => {
@@ -155,7 +163,7 @@ app.post('/api/breakfast', async (req, res) => {
       const current = await readBreakfastData();
       const {
         fields, itemsPatch, itemsDelete, activeAdd, activeRemove,
-        itemOrderAppend, itemOrderRemove, choicesPatch, historyAppend, historyClear,
+        itemOrderAppend, itemOrderRemove, choicesPatch, patchDate, dayRollover, historyAppend, historyClear,
       } = req.body || {};
       if (fields && typeof fields === 'object') {
         Object.assign(current, fields);
@@ -180,7 +188,25 @@ app.post('/api/breakfast', async (req, res) => {
         current.itemOrder = (current.itemOrder || []).filter(id => !itemOrderRemove.includes(id));
       }
       if (choicesPatch && typeof choicesPatch === 'object') {
+        // A pick carries the date the client believes is "today". If the
+        // server still has yesterday's date (its own dayRollover request
+        // hasn't landed yet — a real possibility, since that's a separate
+        // fire-and-forget request from the same device, not guaranteed to
+        // arrive first), roll the day over right here, atomically with
+        // applying the pick. Otherwise a dayRollover request that was just
+        // running behind would show up afterward, see the stale date, and
+        // wipe the pick it never got a chance to protect.
+        if (typeof patchDate === 'string' && current.choicesDate !== patchDate) {
+          current.choices = {};
+          current.activeSubopts = {};
+          current.choicesDate = patchDate;
+        }
         current.choices = { ...(current.choices || {}), ...choicesPatch };
+      }
+      if (typeof dayRollover === 'string' && current.choicesDate !== dayRollover) {
+        current.choices = {};
+        current.activeSubopts = {};
+        current.choicesDate = dayRollover;
       }
       if (historyClear) {
         current.history = [];
