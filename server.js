@@ -115,6 +115,23 @@ function serialize(fn) {
   return p;
 }
 
+// Rolling audit log of every write to the shared breakfast state, so a
+// reported "the kids' choices disappeared" can be diagnosed from actual
+// evidence (what was sent, by which device, and what choices looked like
+// immediately before/after) instead of reconstructed from memory after the
+// fact. In-memory only — fine for same-day diagnosis; doesn't need to
+// survive a restart. Capped so it can't grow unbounded.
+const breakfastWriteLog = [];
+function logBreakfastWrite(entry) {
+  breakfastWriteLog.push({ ts: Date.now(), iso: new Date().toISOString(), ...entry });
+  if (breakfastWriteLog.length > 300) breakfastWriteLog.shift();
+  console.log('[breakfast-write]', JSON.stringify(entry));
+}
+
+app.get('/api/debug-log', (req, res) => {
+  res.json({ count: breakfastWriteLog.length, entries: breakfastWriteLog });
+});
+
 app.get('/api/breakfast', async (req, res) => {
   try {
     res.json(await readBreakfastData());
@@ -161,6 +178,8 @@ app.post('/api/breakfast', async (req, res) => {
   try {
     await serialize(async () => {
       const current = await readBreakfastData();
+      const choicesKidsBefore = Object.keys(current.choices || {});
+      const choicesDateBefore = current.choicesDate;
       const {
         fields, itemsPatch, itemsDelete, activeAdd, activeRemove,
         itemOrderAppend, itemOrderRemove, choicesPatch, patchDate, dayRollover, historyAppend, historyClear,
@@ -214,6 +233,16 @@ app.post('/api/breakfast', async (req, res) => {
         current.history = [...(current.history || []), ...historyAppend];
       }
       await writeBreakfastData(current);
+      logBreakfastWrite({
+        patchKeys: Object.keys(req.body || {}),
+        choicesPatchKids: choicesPatch ? Object.keys(choicesPatch) : undefined,
+        hasFieldsChoices: !!(fields && 'choices' in fields),
+        patchDate, dayRollover,
+        choicesDateBefore, choicesDateAfter: current.choicesDate,
+        choicesKidsBefore, choicesKidsAfter: Object.keys(current.choices || {}),
+        ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        ua: (req.headers['user-agent'] || '').slice(0, 80),
+      });
     });
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
