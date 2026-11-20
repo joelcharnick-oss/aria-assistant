@@ -1,0 +1,92 @@
+# Once a day, before breakfast: is the live app up, running the latest main
+# commit, with working Redis storage — and are dependencies free of known
+# high/critical vulnerabilities? Catches problems even in weeks with no pushes.
+# Failures open a "deploy-alert" issue (which emails you); it closes itself
+# once the check passes again.
+name: Daily health check
+
+on:
+  schedule:
+    - cron: '13 13 * * *'   # 13:13 UTC = 5:13 AM Pacific standard time (6:13 AM in summer)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  live-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check live app against latest main
+        env:
+          REPORT_FILE: ${{ runner.temp }}/report.md
+        run: |
+          COMMIT_TIME="$(git log -1 --format=%cI)"
+          export COMMIT_TIME
+          node .github/scripts/check-live.mjs health "$(git rev-parse HEAD)" 20
+
+      - name: Open or update alert issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f="${{ runner.temp }}/report.md"
+          [ -s "$f" ] || echo "The daily health check failed before it could check the live app. See the workflow run." > "$f"
+          .github/scripts/alert-issue.sh fail "Daily health check" "$f"
+
+      - name: Close alert issue if one is open
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/alert-issue.sh pass "Daily health check"
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: npm audit (high and critical only)
+        run: |
+          set -o pipefail
+          {
+            echo "### npm audit found high/critical vulnerabilities"
+            echo
+            echo '```'
+          } > "${{ runner.temp }}/report.md"
+          status=0
+          npm audit --omit=dev --audit-level=high 2>&1 | tee -a "${{ runner.temp }}/report.md" || status=$?
+          {
+            echo '```'
+            echo
+            echo "Fix: run \`npm audit fix\` locally (or ask Claude), test, and push. See docs/known-issues.md #6."
+          } >> "${{ runner.temp }}/report.md"
+          exit $status
+
+      - name: Open or update alert issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/alert-issue.sh fail "Dependency audit" "${{ runner.temp }}/report.md"
+
+      - name: Close alert issue if one is open
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/alert-issue.sh pass "Dependency audit"

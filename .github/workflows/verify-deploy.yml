@@ -1,0 +1,58 @@
+# After every push to main, confirm Render actually deployed it.
+#
+# Background: Render's GitHub auto-deploy silently stopped firing for about a
+# month (Oct 22 – Nov 20, 2026). Pushes kept landing on main, nothing went
+# live, and nothing said so. This waits for the live app's GET / to report
+# the pushed commit, and opens a "deploy-alert" issue (which emails you) if
+# it doesn't show up in time.
+name: Verify deploy went live
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push supersedes an older one still being verified.
+concurrency:
+  group: verify-deploy
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Render skips deploying commits whose message contains [skip render] / [render skip].
+    if: >-
+      !contains(github.event.head_commit.message, '[skip render]') &&
+      !contains(github.event.head_commit.message, '[render skip]')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Wait for the live app to report this commit
+        env:
+          REPORT_FILE: ${{ runner.temp }}/report.md
+          TIMEOUT_MINUTES: 15
+        run: node .github/scripts/check-live.mjs wait-for-commit "$GITHUB_SHA"
+
+      - name: Open or update alert issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          f="${{ runner.temp }}/report.md"
+          [ -s "$f" ] || echo "The deploy verification job failed before it could check the live app. See the workflow run." > "$f"
+          .github/scripts/alert-issue.sh fail "Deploy verification" "$f"
+
+      - name: Close alert issue if one is open
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/alert-issue.sh pass "Deploy verification"
