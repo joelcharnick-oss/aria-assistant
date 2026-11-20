@@ -308,7 +308,15 @@ app.post('/api/insights', async (req, res) => {
 
 // Health check
 app.get('/', (req, res) => {
-  res.json({ status: 'Aria is online', time: new Date().toISOString() });
+  res.json({
+    status: 'Aria is online',
+    time: new Date().toISOString(),
+    // Render sets this automatically on every deploy — lets us confirm
+    // what's actually live without needing dashboard access, after a
+    // month-long gap where auto-deploy silently stopped firing and nobody
+    // (including this app's own health check) had any way to notice.
+    commit: process.env.RENDER_GIT_COMMIT || null,
+  });
 });
 
 const PORT = process.env.PORT || 3000;
